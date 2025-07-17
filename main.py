@@ -12,7 +12,7 @@ import time
 current_directory = os.path.dirname(os.path.abspath(__file__))
 project_directory = os.path.join(current_directory, "albaraka")
 db_path = os.path.join(project_directory, "orders.db")
-GROUP_CHAT_ID = -4011977891
+GROUP_CHAT_ID = -4864868531
 bot = telebot.TeleBot('6858159801:AAFDXPrzZbwDcxNezxfFc4EgichTus2JY00')
 
 ADMIN_ID = 779172775  # Замените на ваш ID
@@ -43,30 +43,105 @@ def set_status(status):
     cursor.execute("INSERT INTO status (maintenance) VALUES (?)", (status,))
     conn.commit()
     conn.close()
+def init_stock_table():
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_stock (
+            product_id TEXT PRIMARY KEY,
+            stock INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
+def init_db():
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS order_numbers (
+            order_number INTEGER
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_stock (
+            product_id TEXT PRIMARY KEY,
+            stock INTEGER
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+
+
+def get_stock(product_id):
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT stock FROM product_stock WHERE product_id = ?', (product_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else 0
+
+def set_stock(product_id, new_stock):
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO product_stock (product_id, stock)
+        VALUES (?, ?)
+        ON CONFLICT(product_id) DO UPDATE SET stock=excluded.stock
+    ''', (product_id, new_stock))
+    conn.commit()
+    conn.close()
+
+def decrease_stock(product_id, amount):
+    current = get_stock(product_id)
+    set_stock(product_id, max(current - amount, 0))
+
+
+def get_stock_from_db(product_id):
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT stock FROM product_stock WHERE product_id = ?', (product_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+def update_stock_in_db(product_id, stock):
+    conn = sqlite3.connect('orders.db')
+    cursor = conn.cursor()
+    cursor.execute('REPLACE INTO product_stock (product_id, stock) VALUES (?, ?)', (product_id, stock))
+    conn.commit()
+    conn.close()
+
+
+def show_stock_status():
+    result_lines = []
+    for product_id, product in products_clean.items():
+        name = product['name']
+        initial_stock = product.get('stock', 0)
+        current_stock = get_stock(product_id)
+        sold = initial_stock - current_stock
+
+        result_lines.append(
+            f"📦 {name}\n— Изначально: {initial_stock} шт.\n— Осталось: {current_stock} шт.\n— Продано: {sold} шт.\n"
+        )
+
+    return "\n".join(result_lines)
+    
 # Инициализация
 init_db()
 BOT_MAINTENANCE = get_status()
 
-def load_stock_from_txt(products_clean, filename='stock.txt'):
-    if not os.path.exists(filename):
-        return
-    with open(filename, 'r', encoding='utf-8') as f:
-        for line in f:
-            parts = line.strip().split('|')
-            if len(parts) == 3:
-                product_id = parts[0].strip()
-                name = parts[1].strip()
-                stock = int(parts[2].strip())
-                if product_id in products_clean:
-                    products_clean[product_id]['stock'] = stock
+def load_stock_from_db(products_clean):
+    for product_id, product in products_clean.items():
+        db_stock = get_stock_from_db(product_id)
+        if db_stock is not None:
+            product['stock'] = db_stock
 
-def save_stock_to_txt(products_clean, filename='stock.txt'):
-    with open(filename, 'w', encoding='utf-8') as f:
-        for product_id, product in products_clean.items():
-            name = product.get('name', '')
-            stock = product.get('stock', 0)
-            f.write(f"{product_id} | {name} | {stock}\n")
+
+
+
 
 
 
@@ -195,8 +270,10 @@ products_clean = {
     }
 }
     
-load_stock_from_txt(products_clean)
-
+init_stock_table()
+for product_id, product in products_clean.items():
+    update_stock_in_db(product_id, product.get('stock', 0))
+load_stock_from_db(products_clean)
 
 # Форматирование цен
 for product in products_clean.values():
@@ -367,6 +444,16 @@ def cancel_add_to_cart(call):
         pass  # если сообщение уже удалено — не ошибка
 
 
+@bot.message_handler(commands=['stock'])
+def handle_stock_status(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.send_message(message.chat.id, "❌ У вас нет доступа к этой команде.")
+        return
+
+    status = show_stock_status()
+    bot.send_message(message.chat.id, status)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('clean'))
 def show_all_clean_products(call):
     for product_id, product in products_clean.items():
@@ -400,7 +487,7 @@ def call_yes_no_buttons(call):
     # 🔴 ПРОВЕРКА
     product = products_clean.get(product_id)
 
-    if product.get('stock', 0) <= 0:
+    if get_stock(product_id)<= 0:
         bot.answer_callback_query(call.id, "❌ Товара больше нет в наличии.")
         return
 
@@ -469,7 +556,7 @@ def process_quantity(message, product_id, msg_id):
             bot.delete_message(user_chat_id, message.message_id)
         except:
             pass
-        if quantity > product['stock']:
+        if quantity > get_stock(product_id):
             msg = bot.send_message(
                 user_chat_id,
                 f"❌ На складе только {product['stock']} шт. товара. Введите меньшее количество:"
@@ -493,7 +580,7 @@ def process_quantity(message, product_id, msg_id):
 
         # ⬇️ Уменьшаем остаток
         product['stock'] -= quantity
-        save_stock_to_txt(products_clean)
+        update_stock_in_db(product_id, product['stock'])
         
         bot.send_message(
             user_chat_id,
