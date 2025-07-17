@@ -3,7 +3,7 @@ from telebot import types
 import sqlite3
 import os
 import time
-
+import threading
 
 
 
@@ -12,15 +12,15 @@ import time
 current_directory = os.path.dirname(os.path.abspath(__file__))
 project_directory = os.path.join(current_directory, "albaraka")
 db_path = os.path.join(project_directory, "orders.db")
-GROUP_CHAT_ID = -4864868531
-bot = telebot.TeleBot('6858159801:AAFDXPrzZbwDcxNezxfFc4EgichTus2JY00')
+GROUP_CHAT_ID = -4971242631
+bot = telebot.TeleBot('7818783609:AAEWOI3xPYr9ajSDLCF6nK9Kn-SSP6Xd2mc')
 
 ADMIN_ID = 779172775  # Замените на ваш ID
 
 
 
 # База данных для статуса
-def init_db():
+def init_status_db():
     conn = sqlite3.connect('bot_status.db')
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS status
@@ -54,7 +54,8 @@ def init_stock_table():
     ''')
     conn.commit()
     conn.close()
-def init_db():
+
+def init_orders_db():
     conn = sqlite3.connect('orders.db')
     cursor = conn.cursor()
 
@@ -128,9 +129,12 @@ def show_stock_status():
         )
 
     return "\n".join(result_lines)
+
+
     
 # Инициализация
-init_db()
+init_status_db()
+init_orders_db()
 BOT_MAINTENANCE = get_status()
 
 def load_stock_from_db(products_clean):
@@ -151,6 +155,7 @@ def load_stock_from_db(products_clean):
 products_clean = {
     '1': {
         'name': 'ACWELL',
+        'short_description':'1',
          'photo':os.path.join("images", "1. ACWELL.JPG"),
         'price': 8900,
         'stock': 10,
@@ -158,6 +163,7 @@ products_clean = {
     },
     '2': {
         'name': 'ACWELL eye cream ',
+        'short_description':'2',
         'photo':os.path.join("images", "2. ACWELL eye cream.JPG"),
         'price': 10400,
         'stock': 10,
@@ -165,6 +171,7 @@ products_clean = {
     },
     '3': {
         'name': 'GALACTO PORE toner',
+        'short_description':'3',
         'photo': os.path.join("images", "3. GALACTO PORE toner.JPG"),
         'stock': 10,
         'price': 7990,
@@ -172,20 +179,23 @@ products_clean = {
     },
     '4': {
         'name': 'GALACTO PORE SERUM',
+        'short_description':'4',
         'photo': os.path.join("images", "4. GALACTO PORE SERUM.JPG"),
         'price': 9990,
         'stock': 10,
         'description': "Предназначенная для сужения пор, улучшения текстуры кожи и увлажнения. Она является частью популярной линии Galacto Pore от бренда SAM'U, известного своими средствами с ферментированными компонентами."
     },
-    '10': {
+    '5': {
         'name': 'IN THE ZONE',
-        'photo': os.path.join("images", "10. IN THE ZONE.JPG"),
+        'short_description':'5',
+        'photo': os.path.join("images", "5. IN THE ZONE.JPG"),
         'price': 0,
         'stock': 10,
         'description': 'Маска увлажняющая.'
     },
     '6': {
         'name': 'PH SENSITIVE AMPOULE',
+        'short_description':'6',
         'photo': os.path.join("images", "6. PH SENSITIVE AMPOULE(сыворотка).JPG"),
         'price': 13200,
         'stock': 10,
@@ -193,6 +203,7 @@ products_clean = {
     },
     '7': {
         'name': 'PH SENSITIVE CREAM',
+        'short_description':'7',
         'photo': os.path.join("images", "7. PH SENSITIVE CREAM.JPG"),
         'price': 10500,
         'stock': 10,
@@ -200,6 +211,7 @@ products_clean = {
     },
     '8': {
         'name': 'PH SENSITIVE CREAM MIST',
+        'short_description':'8',
         'photo': os.path.join("images", "8. PH SENSITIVE CREAM MIST.JPG"),
         'price': 10590,
         'stock': 10,
@@ -207,6 +219,7 @@ products_clean = {
     },
     '9': {
         'name': 'PH SENSITIVE FACIAL TREATMENT',
+        'short_description':'9',
         'photo': os.path.join("images", "9. PH SENSITIVE FACIAL TREATMENT.JPG"),
         'price': 13590,
         'stock': 10,
@@ -214,6 +227,7 @@ products_clean = {
     },
     '10': {
         'name': 'SENSITIVE POCKET SUN STICK',
+        'short_description':'10',
         'photo': os.path.join("images", "10. SENSITIVE POCKET SUN STICK.JPG"),
         'price': 10500,
         'stock': 10,
@@ -221,6 +235,7 @@ products_clean = {
     },
     '11': {
         'name': 'PH SENSITIVE SPOT CREAM',
+        'short_description':'11',
         'photo': os.path.join("images", "11. PH SENSITIVE SPOT CREAM.JPG"),
         'price': 7990,
         'stock': 10,
@@ -228,6 +243,7 @@ products_clean = {
     },
     '12': {
         'name': 'PH SENSITIVE SUNCREAM',
+        'short_description':'12',
         'photo': os.path.join("images", "12. PH SENSITIVE SUNCREAM.JPG"),
         'price': 8990,
         'stock': 10,
@@ -235,6 +251,7 @@ products_clean = {
     },
     '13': {
         'name': 'PH SENSITIVE TONER PAD',
+        'short_description':'13',
         'photo': os.path.join("images", "13. PH SENSITIVE TONER PAD.JPG"),
         'price': 10005,
         'stock': 10,
@@ -242,6 +259,7 @@ products_clean = {
     },
     '14': {
         'name': 'Born Panthenol(JELLY WASH)',
+        'short_description':'14',
         'photo': os.path.join("images", "14. Born Panthenol(JELLY WASH).JPG"),
         'price': 7800,
         'stock': 10,
@@ -249,6 +267,7 @@ products_clean = {
     },
     '15': {
         'name': 'BRIGHT SIDE UP',
+        'short_description':'15',
         'photo': os.path.join("images", "15. BRIGHT SIDE UP.JPG"),
         'price': 0,
         'stock': 10,
@@ -256,6 +275,7 @@ products_clean = {
     },
     '16': {
         'name': 'THIRST THINGS FIRST',
+        'short_description':'16',
         'photo': os.path.join("images", "16. THIRST THINGS FIRST.JPG"),
         'price': 0,
         'stock': 10,
@@ -263,6 +283,7 @@ products_clean = {
     },
     '17': {
         'name': "SAM'U",
+        'short_description':'17',
         'photo': os.path.join("images", "17. SAMU.JPG"),
         'price': 12900,
         'stock': 10,
@@ -282,6 +303,11 @@ for product in products_clean.values():
 # Глобальные переменные
 carts = {}
 user_states = {}
+last_product_messages = {}
+cart_photo_messages = {}
+cart_message_ids = {}
+catalog_messages_ids= {}
+last_quantity_prompt = {}
 
 # База данных
 def init_db():
@@ -318,6 +344,8 @@ def clear_order_number():
     cursor.execute('DELETE FROM order_numbers')  # удаляем всё
     conn.commit()
     conn.close()
+
+
 
 
 # Клавиатуры
@@ -359,6 +387,7 @@ def get_back_to_menu_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton("🔙 Вернуться в главное меню", callback_data='main_menu'))
     return keyboard
+
 
 
 
@@ -417,12 +446,14 @@ def check_status(call):
 # Обработчики команд
 @bot.message_handler(commands=['start'])
 def start(message):
-    user = message.from_user
+    text = (
+    "Здравствуйте 👋, дорогой покупатель!\n\n"
+    "*Добро пожаловать в GLOW&CO COSMETICS* — магазин корейской косметики премиум-качества 💄\n\n"
+    "Данный бот поможет вам легко и быстро оформить заказ.\n\n"
+    "🏠 Это ваше главное меню. Выберите нужный раздел ниже, чтобы начать покупки!"
+)
     bot.send_message(
-        message.chat.id,
-        f'Здравствуйте 👋, {user.first_name} {user.last_name}!\n' 
-        'Данный бот поможет вам оформить заказ у нашей компании по продаже корейской косметики\n'
-        '🏠 Это ваше главное меню ',
+        message.chat.id,text,parse_mode="Markdown",
         reply_markup=main_menu_keyboard()
     )
 
@@ -455,68 +486,181 @@ def handle_stock_status(message):
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('clean'))
-def show_all_clean_products(call):
+def show_catalog(call):
+    user_chat_id = call.message.chat.id
+    # Удаляем главное меню
+    try:
+        bot.delete_message(user_chat_id, call.message.message_id)
+    except Exception as e:
+        print(f"Не удалось удалить главное меню: {e}")
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
     for product_id, product in products_clean.items():
-        photo_path=product['photo']
-        with open(photo_path, 'rb') as photo:
-            bot.send_photo(
-                call.message.chat.id,
-                photo,
-                f"{product['name']}\n\n📝 {product['description']}\n\n📦 В наличии: {product['stock']}\n\n💸 Цена: {product['formatted_price']} тг",
-                reply_markup=add_in_cart_keybord(product_id)
+        short = product.get('short_description', 'Нет описания')
+        button = types.InlineKeyboardButton(
+            text=f"{product['name']} — {short}",
+            callback_data=f"product_{product_id}"
         )
-        time.sleep(0.5) 
+        markup.add(button)
+    msg = bot.send_message(call.message.chat.id, "✨ Наш каталог готов для вас! Выберите товар ниже:", reply_markup=markup)
+    catalog_messages_ids[user_chat_id] = msg.message_id
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('makeup'))
 def show_all_makeup_products(call):
     bot.answer_callback_query(call.id)  # чтобы убрать "крутилку" загрузки
-    bot.send_message(
+    sent = bot.send_message(
         call.message.chat.id,
         "💄 Раздел *Декоративная косметика* скоро будет доступен!\n\n🔔 Следите за обновлениями!",
         parse_mode='Markdown'
     )
+    time.sleep(5)
+    try:
+        bot.delete_message(chat_id=call.message.chat.id, message_id=sent.message_id)
+    except Exception as e:
+        print(f"Не удалось удалить сообщение: {e}")
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("product_"))
+def show_product_card(call):
+    product_id = call.data.split("_")[1]
+    product = products_clean.get(product_id)
+    if not product:
+        bot.answer_callback_query(call.id, "Товар не найден.")
+        return
+    
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+
+    # Удаляем предыдущую карточку, если была
+    if user_id in last_product_messages:
+        try:
+            bot.delete_message(chat_id, last_product_messages[user_id])
+        except Exception as e:
+            print(f"Не удалось удалить старое сообщение: {e}")
+
+    # Подготовка данных
+    photo = product['photo']
+    name = product['name']
+    description = product['description']
+    price = product['formatted_price']
+    stock = get_stock(product_id)
+
+    text = (
+        f"📦 <b>{name}</b>\n\n"
+        f"{description}\n\n"
+        f"💰 Цена: {price}₸\n"
+        f"🔢 В наличии: {stock} шт.\n\n"
+        f"Добавить этот товар в корзину?"
+    )
+
+
+    # Отправляем
+    with open(photo, 'rb') as photo_file:
+        sent_msg = bot.send_photo(
+            call.message.chat.id,
+            photo_file,
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=confirm_keyboard(product_id)
+  
+        )
+
+     # Сохраняем ID отправленного сообщения
+    last_product_messages[user_id] = sent_msg.message_id
+    bot.answer_callback_query(call.id)
 
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('add_in_cart'))
 def call_yes_no_buttons(call):
-    product_id = call.data.split('_')[-1]
-    product = products_clean[product_id]
-    
-    
-    # 🔴 ПРОВЕРКА
-    product = products_clean.get(product_id)
-
-    if get_stock(product_id)<= 0:
-        bot.answer_callback_query(call.id, "❌ Товара больше нет в наличии.")
-        return
-
- 
-
-    bot.send_message(
-        call.message.chat.id,
-        f"Вы уверены, что хотите добавить в корзину этот товар? *{product['name']}*",
-        reply_markup=confirm_keyboard(product_id),
-        parse_mode='Markdown'
-    )
-
+    try:
+        product_id = call.data.split('_')[-1]
+        user_chat_id = call.message.chat.id
+        
+        # Проверяем существование товара
+        product = products_clean.get(product_id)
+        if not product:
+            bot.answer_callback_query(call.id, "❌ Товар не найден.")
+            return
+            
+        # Проверяем наличие товара
+        current_stock = get_stock(product_id)
+        if current_stock <= 0:
+            bot.answer_callback_query(call.id, "❌ Товара нет в наличии.")
+            
+            # Пытаемся удалить сообщение с товаром, если его нет в наличии
+            try:
+                bot.delete_message(user_chat_id, call.message.message_id)
+            except Exception as e:
+                print(f"Не удалось удалить сообщение: {e}")
+            return
+            
+        # Если товар есть, показываем подтверждение добавления
+        bot.send_message(
+            user_chat_id,
+            f"Вы уверены, что хотите добавить в корзину этот товар? *{product['name']}*",
+            reply_markup=confirm_keyboard(product_id),
+            parse_mode='Markdown'
+        )
+        
+        # Удаляем предыдущее сообщение с кнопкой "Добавить в корзину"
+        try:
+            bot.delete_message(user_chat_id, call.message.message_id)
+        except Exception as e:
+            print(f"Не удалось удалить предыдущее сообщение: {e}")
+            
+    except Exception as e:
+        print(f"Ошибка в обработчике add_in_cart: {e}")
+        bot.answer_callback_query(call.id, "⚠️ Произошла ошибка. Попробуйте позже.")
 
 @bot.callback_query_handler(func=lambda call: call.data == 'main_menu')
 def return_to_menu(call):
+    user_chat_id = call.message.chat.id
+    # Удаляем текущее сообщение с кнопками
     try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        bot.send_message(call.message.chat.id, "🏠 Главное меню:",  reply_markup=main_menu_keyboard())
+        bot.delete_message(user_chat_id, call.message.message_id)
     except Exception as e:
-        print(f"Ошибка удаления: {e}")
+        print(f"Ошибка удаления текущего сообщения: {e}")
+
+    # Удаляем все карточки каталога
+    if user_chat_id in catalog_messages_ids:
+        try:
+            bot.delete_message(user_chat_id, catalog_messages_ids[user_chat_id])
+            del catalog_messages_ids[user_chat_id]
+        except Exception as e:
+            print(f"Ошибка удаления каталога: {e}")
+
+    # Отправляем главное меню
+    bot.send_message(
+        user_chat_id,
+        "🏠 Главное меню:",
+        reply_markup=main_menu_keyboard()
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'continue_shopping')
 def continue_shopping(call):
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
+
+    # Удаляем кнопку
     try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+        bot.delete_message(chat_id, message_id)
     except:
         pass
-    bot.answer_callback_query(call.id, "Продолжайте выбирать товары!")
+
+    # Отправляем сообщение
+    sent_msg = bot.send_message(chat_id, "🛍 Продолжайте выбирать товары!")
+
+    # Удаляем его через 3 секунды в отдельном потоке
+    def delete_later(chat_id, msg_id):
+        time.sleep(3)
+        try:
+            bot.delete_message(chat_id, msg_id)
+        except:
+            pass
+
+    threading.Thread(target=delete_later, args=(chat_id, sent_msg.message_id)).start()
 
 
    
@@ -533,6 +677,7 @@ def add_to_cart(call):
         pass
     
     msg = bot.send_message(user_chat_id, "Сколько штук вы хотите заказать? Введите число:")
+    last_quantity_prompt[user_chat_id] = msg.message_id
     bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
 
 def process_quantity(message, product_id, msg_id):
@@ -544,43 +689,61 @@ def process_quantity(message, product_id, msg_id):
             raise ValueError
         
         product = products_clean[product_id]
+        current_stock = get_stock(product_id)  # Получаем текущий остаток
         
-       # Удаляем сообщение с запросом количества
-        try:
-            bot.delete_message(user_chat_id, msg_id)  
-        except:
-            pass
+        # Проверка наличия
+        if current_stock < quantity:
+            # Удаляем предыдущее сообщение, если есть
+            if user_chat_id in last_quantity_prompt:
+                try:
+                    bot.delete_message(user_chat_id, message.message_id)
+                except:
+                    pass
+                # Удаляем предыдущее сообщение "Введите количество", если есть
+                if user_chat_id in last_quantity_prompt:
+                    try:
+                        bot.delete_message(user_chat_id, last_quantity_prompt[user_chat_id])
+                    except:
+                        pass
+                    last_quantity_prompt.pop(user_chat_id, None)
 
-        # Удаляем сообщение с введённым числом
+            msg = bot.send_message(
+                user_chat_id,
+                f"❌ На складе только {current_stock} шт. товара. Введите меньшее количество:"
+            )
+            last_quantity_prompt[user_chat_id] = msg.message_id
+            bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
+            return
+        
+        # Удаляем сообщения
         try:
+            bot.delete_message(user_chat_id, msg_id)
             bot.delete_message(user_chat_id, message.message_id)
         except:
             pass
-        if quantity > get_stock(product_id):
-            msg = bot.send_message(
-                user_chat_id,
-                f"❌ На складе только {product['stock']} шт. товара. Введите меньшее количество:"
-            )
-            bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
-            return
         
         # Добавляем в корзину
         if user_chat_id not in carts:
             carts[user_chat_id] = []
         
+        # Проверяем, есть ли уже такой товар в корзине
+        item_exists = False
+        for item in carts[user_chat_id]:
+            if item['product_id'] == product_id:
+                item['quantity'] += quantity
+                item_exists = True
+                break
         
-        carts[user_chat_id].append({
-            'photo': product['photo'],
-            'name': product['name'],
-            'price': product['price'],
-            'quantity': quantity,
-            'product_id': product_id
-        })
-
-
+        if not item_exists:
+            carts[user_chat_id].append({
+                'photo': product['photo'],
+                'name': product['name'],
+                'price': product['price'],
+                'quantity': quantity,
+                'product_id': product_id
+            })
         # ⬇️ Уменьшаем остаток
-        product['stock'] -= quantity
-        update_stock_in_db(product_id, product['stock'])
+        decrease_stock(product_id, quantity)
         
         bot.send_message(
             user_chat_id,
@@ -588,44 +751,78 @@ def process_quantity(message, product_id, msg_id):
             reply_markup=post_add_keyboard()
         )
         
-        
     except ValueError:
+        user_chat_id = message.chat.id
+        try:
+            bot.delete_message(user_chat_id, message.message_id)
+        except:
+            pass
+         
+         # Удаляем предыдущее сообщение, если есть
+        if user_chat_id in last_quantity_prompt:
+            try:
+                bot.delete_message(user_chat_id, last_quantity_prompt[message.chat.id])
+            except:
+                pass
+            last_quantity_prompt.pop(user_chat_id, None)
+        
         msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите корректное число больше нуля!")
+        last_quantity_prompt[message.chat.id] = msg.message_id
         bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
+
 
 @bot.callback_query_handler(func=lambda call: call.data == 'cart')
 def show_cart(call):
     user_chat_id = call.message.chat.id
+
+    # Удаляем главное меню
+    try:
+        bot.delete_message(user_chat_id, call.message.message_id)
+    except Exception as e:
+        print(f"Не удалось удалить главное меню: {e}")
+
     if user_chat_id not in carts or not carts[user_chat_id]:
         bot.send_message(
-            user_chat_id, 
+            user_chat_id,
             "🛒 Ваша корзина пуста.",
             reply_markup=get_back_to_menu_keyboard()
         )
         return
-    
-    
+
+    # Удаляем старые сообщения, если нужно
+    if user_chat_id in cart_message_ids:
+        for msg_id in cart_message_ids[user_chat_id]:
+            try:
+                bot.delete_message(user_chat_id, msg_id)
+            except:
+                pass
+        cart_message_ids[user_chat_id].clear()
+    else:
+        cart_message_ids[user_chat_id] = []
+
+    # Формируем сообщение
+    text = "🛒 *Ваша корзина:*\n\n"
     total = 0
     for item in carts[user_chat_id]:
         item_total = item['price'] * item['quantity'] / 1000
         total += item_total
-        
-        # Отправляем фото товара с описанием
-        with open(item['photo'], 'rb') as photo:
-            bot.send_photo(
-            user_chat_id,
-            photo,
-            caption=f"📦 {item['name']}\n"
-                   f"🔢 Количество: {item['quantity']} шт.\n"
-                   f"💰 Цена: {item_total:.3f}тг"
+        text += (
+            f"📦 *{item['name']}*\n"
+            f"🔢 Количество: {item['quantity']} шт.\n"
+            f"💰 Цена: {item_total:.3f} тг\n\n"
         )
-    
-    bot.send_message(
+    text += f"💳 *Итого: {total:.3f} тг*"
+
+    # Кнопки
+    markup = confirm_keyboard()  # 'Оформить', 'Редактировать', 'Назад в меню'
+
+    sent = bot.send_message(
         user_chat_id,
-        f"💳 Итого к оплате: {total:.3f}тг\n"
-        "Выберите действие:",
-        reply_markup=confirm_keyboard()
+        text,
+        parse_mode='Markdown',
+        reply_markup=markup
     )
+    cart_message_ids[user_chat_id].append(sent.message_id)
 
 @bot.callback_query_handler(func=lambda call: call.data == 'checkout')
 def start_checkout(call):
@@ -654,6 +851,7 @@ def process_address(message):
     bot.send_message(user_chat_id, "Введите ваш номер телефона:")
     bot.register_next_step_handler(message, process_phone)
 
+
 def process_phone(message):
     try:
         user_chat_id = message.chat.id
@@ -673,6 +871,7 @@ def process_phone(message):
             order_items.append(
                 f"{item['name']} - {item['quantity']} шт. = {item_total:.3f}тг"
             )
+            
         
         order_text = (
             f"🛒 Новый заказ #{order_number}\n"
@@ -695,7 +894,7 @@ def process_phone(message):
             reply_markup=types.ReplyKeyboardRemove()
         )
         
-        # Очищаем корзину
+        # Очищаем корзину и состояние
         if user_chat_id in carts:
             del carts[user_chat_id]
         if user_chat_id in user_states:
@@ -734,15 +933,52 @@ def remove_item(call):
     
     if user_chat_id in carts and 0 <= index < len(carts[user_chat_id]):
         removed_item = carts[user_chat_id].pop(index)
-        bot.send_message(
-            user_chat_id,
-            f"🗑️ Товар {removed_item['name']} удален из корзины."
-        )
-    
-    show_cart(call)
+        
+        # Удаляем сообщение с кнопками удаления
+        try:
+            bot.delete_message(user_chat_id, call.message.message_id)
+        except:
+            pass
+        
+        # Возвращаем товар на склад
+        product_id = removed_item['product_id']
+        current_stock = get_stock(product_id)
+        update_stock_in_db(product_id, current_stock + removed_item['quantity'])
+        
+        # Если корзина пуста
+        if len(carts[user_chat_id]) == 0:
+            del carts[user_chat_id]  # Удаляем пустую корзину
+
+             # Удаляем ещё одно сообщение (предыдущее), если оно осталось
+            try:
+                bot.delete_message(user_chat_id, call.message.message_id - 1)
+            except:
+                pass
+
+            bot.send_message(
+                user_chat_id,
+                "🛒 Ваша корзина теперь пуста.",
+                reply_markup=get_back_to_menu_keyboard()
+            )
+        else:
+            # Показываем обновленную корзину
+            show_cart(call)
+    else:
+        bot.answer_callback_query(call.id, "❌ Товар не найден в корзине.")
 
 @bot.callback_query_handler(func=lambda call: call.data == 'main_menu')
 def back_to_main(call):
+    user_chat_id = call.message.chat.id
+
+     # Удаляем все сообщения корзины
+    if user_chat_id in cart_message_ids:
+        for msg_id in cart_message_ids[user_chat_id]:
+            try:
+                bot.delete_message(user_chat_id, msg_id)
+            except:
+                pass
+        del cart_message_ids[user_chat_id]
+
     start(call.message)
 
 
