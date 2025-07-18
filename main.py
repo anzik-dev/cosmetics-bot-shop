@@ -345,6 +345,24 @@ def clear_order_number():
     conn.commit()
     conn.close()
 
+def get_product_by_id(product_id):
+    conn = sqlite3.connect('db/orders.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT name, description, price, photo, stock FROM products WHERE product_id = ?", (product_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        name, description, price, photo, stock = row
+        return {
+            'name': name,
+            'description': description,
+            'price': price,
+            'formatted_price': f"{price:,}".replace(",", " "),
+            'photo': photo,
+            'stock': stock
+        }
+    return None
 
 
 
@@ -589,29 +607,29 @@ def show_all_makeup_products(call):
         print(f"Не удалось удалить сообщение: {e}")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("product_"))
-def show_product_card(call):
+def show_product_card(call: CallbackQuery):
     product_id = call.data.split("_")[1]
-    product = products_clean.get(product_id)
+    product = get_product_by_id(product_id)
     if not product:
         bot.answer_callback_query(call.id, "Товар не найден.")
         return
-    
+
     user_id = call.from_user.id
     chat_id = call.message.chat.id
 
-    # Удаляем предыдущую карточку, если была
+    # Удаляем предыдущее сообщение
     if user_id in last_product_messages:
         try:
             bot.delete_message(chat_id, last_product_messages[user_id])
         except Exception as e:
             print(f"Не удалось удалить старое сообщение: {e}")
 
-    # Подготовка данных
+    # Данные из базы
     photo = product['photo']
     name = product['name']
     description = product['description']
     price = product['formatted_price']
-    stock = get_stock(product_id)
+    stock = product['stock']
 
     text = (
         f"📦 <b>{name}</b>\n\n"
@@ -621,21 +639,18 @@ def show_product_card(call):
         f"Добавить этот товар в корзину?"
     )
 
-
-    # Отправляем
     with open(photo, 'rb') as photo_file:
         sent_msg = bot.send_photo(
-            call.message.chat.id,
+            chat_id,
             photo_file,
             caption=text,
             parse_mode="HTML",
             reply_markup=confirm_keyboard(product_id)
-  
         )
 
-     # Сохраняем ID отправленного сообщения
     last_product_messages[user_id] = sent_msg.message_id
     bot.answer_callback_query(call.id)
+
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'main_menu')
