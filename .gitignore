@@ -1,0 +1,16 @@
+# Базы данных
+db/orders.db
+bot_status.db
+
+# Служебные файлы
+bot_status.json
+
+# Кэш Python
+__pycache__/
+*.pyc
+
+# Файлы окружения
+.env
+
+# Логи (если используешь)
+*.log
