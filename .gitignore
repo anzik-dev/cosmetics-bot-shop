@@ -1,9 +1,9 @@
 # Базы данных
-#db/orders.db
-#bot_status.db
+db/orders.db
+bot_status.db
 
 # Служебные файлы
-#bot_status.json
+bot_status.json
 
 # Кэш Python
 __pycache__/

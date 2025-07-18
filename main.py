@@ -4,154 +4,110 @@ import sqlite3
 import os
 import time
 import threading
+import json
 
+#Удаление надписи после задержки
+def delete_after_delay(chat_id, message_id, delay):
+    time.sleep(delay)
+    try:
+        bot.delete_message(chat_id, message_id)
+    except:
+        pass
 
-
-
-# Настройки
-current_directory = os.path.dirname(os.path.abspath(__file__))
-project_directory = os.path.join(current_directory, "albaraka")
-db_path = os.path.join(project_directory, "orders.db")
+# ==================== Настройки ====================
+TOKEN = '7818783609:AAEWOI3xPYr9ajSDLCF6nK9Kn-SSP6Xd2mc'
 GROUP_CHAT_ID = -4971242631
-bot = telebot.TeleBot('7818783609:AAEWOI3xPYr9ajSDLCF6nK9Kn-SSP6Xd2mc')
+ADMIN_ID = 779172775  # Ваш Telegram ID администратора
 
-ADMIN_ID = 779172775  # Замените на ваш ID
+# Путь к базе данных
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'orders.db')
+
+# Инициализация бота
+bot = telebot.TeleBot(TOKEN)
 
 
+# ==================== Функции работы с БД ====================
 
-# База данных для статуса
-def init_status_db():
-    conn = sqlite3.connect('bot_status.db')
+def init_db():
+    """Создает таблицы products и orders, если их нет."""
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS status
-                     (maintenance BOOLEAN)''')
+    # Таблица товаров
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        stock INTEGER
+    )
+    """)
+    # Таблица заказов
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        address TEXT,
+        phone TEXT,
+        products_json TEXT,
+        total_price REAL,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """
+    )
     conn.commit()
     conn.close()
 
-def get_status():
-    conn = sqlite3.connect('bot_status.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT maintenance FROM status LIMIT 1")
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else False
 
-def set_status(status):
-    conn = sqlite3.connect('bot_status.db')
+
+
+def init_stock(products_clean: dict) -> int:
+    """Один раз добавляет товары из словаря в таблицу products."""
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM status")
-    cursor.execute("INSERT INTO status (maintenance) VALUES (?)", (status,))
-    conn.commit()
-    conn.close()
-def init_stock_table():
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_stock (
-            product_id TEXT PRIMARY KEY,
-            stock INTEGER
+    inserted = 0
+    for pid, data in products_clean.items():
+        cursor.execute(
+            "INSERT OR IGNORE INTO products (id, name, stock) VALUES (?, ?, ?)",
+            (pid, data['name'], data['stock'])
         )
-    ''')
+        if cursor.rowcount:
+            inserted += 1
     conn.commit()
     conn.close()
+    return inserted
 
-def init_orders_db():
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
+
+def get_stock_from_db(product_id: str) -> int:
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS order_numbers (
-            order_number INTEGER
-        )
-    ''')
-
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_stock (
-            product_id TEXT PRIMARY KEY,
-            stock INTEGER
-        )
-    ''')
-
-    conn.commit()
+    cursor.execute("SELECT stock FROM products WHERE id = ?", (product_id,))
+    row = cursor.fetchone()
     conn.close()
+    return row[0] if row else 0
 
 
-def get_stock(product_id):
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
+def update_stock_in_db(product_id: str, new_stock: int):
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT stock FROM product_stock WHERE product_id = ?', (product_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else 0
-
-def set_stock(product_id, new_stock):
-    conn = sqlite3.connect('db/orders.db, check_same_thread=False')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO product_stock (product_id, stock)
-        VALUES (?, ?)
-        ON CONFLICT(product_id) DO UPDATE SET stock=excluded.stock
-    ''', (product_id, new_stock))
-    conn.commit()
-    conn.close()
-
-def decrease_stock(product_id, amount):
-    current = get_stock(product_id)
-    set_stock(product_id, max(current - amount, 0))
-
-
-def get_stock_from_db(product_id):
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('SELECT stock FROM product_stock WHERE product_id = ?', (product_id,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else None
-
-def update_stock_in_db(product_id, stock):
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('REPLACE INTO product_stock (product_id, stock) VALUES (?, ?)', (product_id, stock))
+    cursor.execute("UPDATE products SET stock = ? WHERE id = ?", (new_stock, product_id))
     conn.commit()
     conn.close()
 
 
-def show_stock_status():
-    result_lines = []
-    for product_id, product in products_clean.items():
-        name = product['name']
-        initial_stock = product.get('stock', 0)
-        current_stock = get_stock(product_id)
-        sold = initial_stock - current_stock
+def save_order(user_name: str, user_address: str, user_phone: str,
+               cart_items: dict, total_price: float) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO orders (name, address, phone, products_json, total_price) VALUES (?, ?, ?, ?, ?)",
+        (user_name, user_address, user_phone, json.dumps(cart_items, ensure_ascii=False), total_price)
+    )
+    conn.commit()
+    order_id = cursor.lastrowid
+    conn.close()
+    return order_id
 
-        result_lines.append(
-            f"📦 {name}\n— Изначально: {initial_stock} шт.\n— Осталось: {current_stock} шт.\n— Продано: {sold} шт.\n"
-        )
-
-    return "\n".join(result_lines)
-
-
-    
-# Инициализация
-init_status_db()
-init_orders_db()
-BOT_MAINTENANCE = get_status()
-
-def load_stock_from_db(products_clean):
-    for product_id, product in products_clean.items():
-        db_stock = get_stock_from_db(product_id)
-        if db_stock is not None:
-            product['stock'] = db_stock
-
-
-
-
-
-
-
-
-
-# Данные о товарах (замените photo_base64 на реальные данные)
+# ==================== Данные о товарах ====================
 products_clean = {
     '1': {
         'name': 'ACWELL',
@@ -290,394 +246,522 @@ products_clean = {
         'description': 'Это несмываемая ампульная сыворотка для волос, предназначенная для интенсивного увлажнения и восстановления структуры волос'
     }
 }
-    
-init_stock_table()
-for product_id, product in products_clean.items():
-    update_stock_in_db(product_id, product.get('stock', 0))
-load_stock_from_db(products_clean)
 
-# Форматирование цен
-for product in products_clean.values():
-    product['formatted_price'] = '{:.3f}'.format(product['price'] / 1000) 
-
-# Глобальные переменные
-carts = {}
-user_states = {}
-last_product_messages = {}
-cart_photo_messages = {}
+# ==================== Глобальные переменные ====================
+carts = {}              # {user_id: [ {product_id, name, price, quantity, photo}, ... ]}
+user_states = {}        # для оформления заказа
+last_quantity_prompt = {}  # для удаления сообщения с запросом
+catalog_messages_ids = {}
 cart_message_ids = {}
-catalog_messages_ids= {}
-last_quantity_prompt = {}
+admin_product_ids = {}
+cart_message_ids = {}
+edit_message_ids = {} 
+user_cart_messages = {}
 
-# База данных
-def init_db():
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS order_numbers (order_number INTEGER)')
-    conn.commit()
-    conn.close()
+# ==================== Клавиатуры ====================
 
-init_db()
-
-def get_order_number():
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('SELECT order_number FROM order_numbers')
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else 0
-
-def update_order_number(new_number):
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    if get_order_number() == 0:
-        cursor.execute('INSERT INTO order_numbers (order_number) VALUES (?)', (new_number,))
-    else:
-        cursor.execute('UPDATE order_numbers SET order_number = ?', (new_number,))
-    conn.commit()
-    conn.close()
-
-# Очистка базы данных
-def clear_order_number():
-    conn = sqlite3.connect('db/orders.db', check_same_thread=False)
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM order_numbers')  # удаляем всё
-    conn.commit()
-    conn.close()
-
-def get_product_by_id(product_id):
-    conn = sqlite3.connect('db/orders.db')
-    cursor = conn.cursor()
-    cursor.execute("SELECT name, description, price, photo, stock FROM products WHERE product_id = ?", (product_id,))
-    row = cursor.fetchone()
-    conn.close()
-
-    if row:
-        name, description, price, photo, stock = row
-        return {
-            'name': name,
-            'description': description,
-            'price': price,
-            'formatted_price': f"{price:,}".replace(",", " "),
-            'photo': photo,
-            'stock': stock
-        }
-    return None
-
-
-
-# Клавиатуры
 def main_menu_keyboard():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(types.InlineKeyboardButton('Уходовая косметика 🧴', callback_data='clean'))
-    keyboard.add(types.InlineKeyboardButton('Декоративная косметика 💄',callback_data='makeup'))
-    keyboard.add(types.InlineKeyboardButton('Корзина 🛒', callback_data='cart'))
-    return keyboard
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(types.InlineKeyboardButton('Уходовая косметика 🧴', callback_data='clean'))
+    kb.add(types.InlineKeyboardButton('Декоративная косметика 💄', callback_data='makeup'))
+    kb.add(types.InlineKeyboardButton('Корзина 🛒', callback_data='cart'))
+    return kb
 
-def post_add_keyboard():
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("🔙 Вернуться в главное меню", callback_data='main_menu'),
-        types.InlineKeyboardButton("🛍 Продолжить покупки", callback_data='continue_shopping')
-    )
-    return keyboard
 
 def confirm_keyboard(product_id=None):
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    kb = types.InlineKeyboardMarkup(row_width=2)
     if product_id:
-        keyboard.add(
-            types.InlineKeyboardButton('✅ Да, добавить', callback_data=f'add_{product_id}'),
-            types.InlineKeyboardButton('❌ Нет, спасибо', callback_data='deleting')
-        )
+        kb.add(types.InlineKeyboardButton('✅ Добавить', callback_data=f'add_{product_id}'))
+        kb.add(types.InlineKeyboardButton('❌ Отмена', callback_data=f'cancel_{product_id}'))
     else:
-        keyboard.add(
-            types.InlineKeyboardButton('✅ Оформить заказ', callback_data='checkout'),
-            types.InlineKeyboardButton('✏️ Изменить корзину', callback_data='edit_cart'),
-            types.InlineKeyboardButton('❌ Выйти из корзины', callback_data='main_menu')
-        )
-    return keyboard 
+        kb.add(types.InlineKeyboardButton('✅ Оформить заказ', callback_data='checkout'))
+        kb.add(types.InlineKeyboardButton('✏️ Редактировать корзину', callback_data='edit_cart'))
+        kb.add(types.InlineKeyboardButton('🔙 Главное меню', callback_data='main_menu'))
+    return kb
 
 
-def get_back_to_menu_keyboard():
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("🔙 Вернуться в главное меню", callback_data='main_menu'))
-    return keyboard
+def post_add_keyboard():
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(types.InlineKeyboardButton('🛍 Продолжить покупки', callback_data='continue_shopping'))
+    kb.add(types.InlineKeyboardButton('🔙 Главное меню', callback_data='main_menu'))
+    return kb
 
 
+def back_to_menu_keyboard():
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton('🔙 Главное меню', callback_data='main_menu'))
+    return kb
 
+# ==================== Обработчики ====================
 
-# 1. Обработчик техобслуживания (ПЕРВЫЙ!)
-@bot.message_handler(func=lambda m: BOT_MAINTENANCE and not m.text.startswith('/maintenance'))
-def maintenance_handler(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🔄 Проверить статус", callback_data="check_status"))
-    bot.send_message(
-        message.chat.id,
-        "🔧 Бот на техническом обслуживании\nПопробуйте позже.",
-        reply_markup=markup
-    )
-
-
-@bot.callback_query_handler(func=lambda call: BOT_MAINTENANCE)
-def handle_maintenance_callback(call):
-    bot.answer_callback_query(call.id, "🔧 Бот на техническом обслуживании", show_alert=True)
-
-
-# 2. Команда управления режимом
-@bot.message_handler(commands=['maintenance'])
-def toggle_maintenance(message):
-    global BOT_MAINTENANCE
-    if message.from_user.id == ADMIN_ID:
-        BOT_MAINTENANCE = not BOT_MAINTENANCE
-        set_status(BOT_MAINTENANCE)  # Сохраняем в БД
-        
-        status = "🛑 АКТИВИРОВАН" if BOT_MAINTENANCE else "✅ ОТКЛЮЧЕН"
-        bot.reply_to(message, f"Режим обслуживания {status}")
-        
-        if not BOT_MAINTENANCE:
-            bot.send_message(
-                message.chat.id,
-                "✅ Бот снова доступен для всех пользователей!",
-                reply_markup=types.ReplyKeyboardRemove()
-            )
-    else:
-        bot.reply_to(message, "⛔ Недостаточно прав!")
-
-    
-# 3. Обработчик кнопки проверки статуса
-@bot.callback_query_handler(func=lambda call: call.data == "check_status")
-def check_status(call):
-    if BOT_MAINTENANCE:
-        bot.answer_callback_query(call.id, "🔧 Бот всё ещё на обслуживании")
-    else:
-        bot.answer_callback_query(call.id, "✅ Бот снова доступен!", show_alert=True)
-        try:
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-        except:
-            pass
-
-
-
-# Обработчики команд
 @bot.message_handler(commands=['start'])
 def start(message):
     text = (
     "Здравствуйте 👋, дорогой покупатель!\n\n"
     "*Добро пожаловать в GLOW&CO COSMETICS* — магазин корейской косметики премиум-качества 💄\n\n"
     "Данный бот поможет вам легко и быстро оформить заказ.\n\n"
-    "🏠 Это ваше главное меню. Выберите нужный раздел ниже, чтобы начать покупки!"
-)
+    "🏠 Это ваше главное меню. Выберите нужный раздел ниже, чтобы начать покупки!")
     bot.send_message(
         message.chat.id,text,parse_mode="Markdown",
         reply_markup=main_menu_keyboard()
     )
-# Главная админ-панель
+
+@bot.message_handler(commands=['init_stock'])
+def cmd_init_stock(message):
+    if message.chat.id != ADMIN_ID:
+        return bot.reply_to(message, '❌ Доступ запрещен')
+    count = init_stock(products_clean)
+    bot.reply_to(message, f'✅ Добавлено товаров: {count}')
+
+@bot.message_handler(commands=['reset_orders'])
+def cmd_reset_orders(message):
+    if message.chat.id != ADMIN_ID:
+        return bot.reply_to(message, '❌ Доступ запрещен')
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Удаляем все заказы
+    cursor.execute('DELETE FROM orders')
+
+    # Сбрасываем счётчик AUTOINCREMENT
+    cursor.execute('DELETE FROM sqlite_sequence WHERE name="orders"')
+
+    conn.commit()
+    conn.close()
+
+    bot.reply_to(message, '✅ История заказов и счётчик сброшены (следующий заказ будет #1)')
+
+
+# Админ-панель управления stock
+# Админ-панель управления stock
 @bot.message_handler(commands=['admin'])
 def admin_panel(message):
     if message.chat.id != ADMIN_ID:
         return
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
-    for product_id, product in products_clean.items():
-        button = types.InlineKeyboardButton(
-            text=f"{product['short_description']} | {product['stock']} шт.",
-            callback_data=f"admin_edit_{product_id}"
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    for index, product_id in enumerate(products_clean.keys(), start=1):
+        product_data = products_clean[product_id]
+        name = product_data['name']
+
+        cursor.execute("SELECT stock FROM products WHERE id = ?", (product_id,))
+        row = cursor.fetchone()
+        stock = row[0] if row else 0
+
+        text = f"*{index}. {name}* — `{stock}` шт."
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✏️ Изменить количество", callback_data=f"set_{product_id}"))
+
+        bot.send_message(
+            message.chat.id,
+            text,
+            parse_mode="Markdown",
+            reply_markup=markup
         )
-        keyboard.add(button)
-    bot.send_message(message.chat.id, "📦 Выберите товар для редактирования:", reply_markup=keyboard)
 
-# Редактирование товара
-@bot.callback_query_handler(func=lambda call: call.data.startswith('admin_edit_'))
-def edit_product(call):
-    product_id = call.data.split('_')[-1]
-    product = products_clean[product_id]
-    stock = get_stock(product_id)
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton("➕ Увеличить на 1", callback_data=f"stock_inc1_{product_id}"),
-        types.InlineKeyboardButton("➖ Уменьшить на 1", callback_data=f"stock_dec1_{product_id}")
-    )
-    keyboard.add(
-        types.InlineKeyboardButton("✏️ Ввести вручную", callback_data=f"stock_manual_{product_id}"),
-        types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_admin")
-    )
-    bot.edit_message_text(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        text=f"🛍 {product['name']}\nВ наличии: {stock} шт.",
-        reply_markup=keyboard
-    )
-
-# Обработка увеличения/уменьшения
-@bot.callback_query_handler(func=lambda call: call.data.startswith(('stock_inc1_', 'stock_dec1_')))
-def update_stock_simple(call):
-    product_id = call.data.split('_')[-1]
-    change = 1 if 'inc1' in call.data else -1
-    current = get_stock(product_id)
-    new_stock = max(current + change, 0)
-    set_stock(product_id, new_stock)
-    products_clean[product_id]['stock'] = new_stock
-    edit_product(call)
-
-# Ввод вручную
-@bot.callback_query_handler(func=lambda call: call.data.startswith('stock_manual_'))
-def ask_manual_stock(call):
-    product_id = call.data.split('_')[-1]
-    msg = bot.send_message(call.message.chat.id, "Введите новое количество:")
-    bot.register_next_step_handler(msg, set_manual_stock, product_id)
+    conn.close()
 
 
-def set_manual_stock(message, product_id):
+# Обработка запроса на изменение
+@bot.callback_query_handler(lambda c: c.data.startswith('set_'))
+def ask_set_stock(call):
+    pid = call.data.split('_')[1]
+    admin_product_ids[call.message.chat.id] = pid
+    bot.send_message(call.message.chat.id, f"Введите новое количество для ID {pid}:")
+    bot.register_next_step_handler_by_chat_id(call.message.chat.id, process_set_stock)
+
+# Обработка ввода нового количества
+def process_set_stock(message):
+    user_id = message.chat.id
+    pid = admin_product_ids.get(user_id)
     try:
-        stock = int(message.text.strip())
-        if stock < 0:
-            raise ValueError
-    except ValueError:
-        bot.reply_to(message, "❌ Введите корректное число")
-        return
-    set_stock(product_id, stock)
-    products_clean[product_id]['stock'] = stock
-    bot.send_message(message.chat.id, f"✅ Количество обновлено: {stock} шт.")
-    admin_panel(message)
-
-# Назад
-@bot.callback_query_handler(func=lambda call: call.data == 'back_to_admin')
-def back_to_admin_panel(call):
-    admin_panel(call.message)
-
-@bot.message_handler(commands=['reset_orders'])
-def reset_orders(message):
-    if message.chat.id == ADMIN_ID:
-        clear_order_number()
-        bot.send_message(message.chat.id, "✅ Номер заказа успешно сброшен.")
-    else:
-        bot.send_message(message.chat.id, "❌ У вас нет доступа к этой команде.")
-
-# Обработчики callback
-@bot.callback_query_handler(func=lambda call: call.data == 'deleting')
-def cancel_add_to_cart(call):
-    try:
-        bot.delete_message(call.message.chat.id, call.message.message_id)
+        new_stock = int(message.text)
     except:
-        pass  # если сообщение уже удалено — не ошибка
+        return bot.send_message(user_id, "❌ Введите число.")
+
+    update_stock_in_db(pid, new_stock)
+    bot.send_message(user_id, f"✅ Обновлено: ID {pid} = {new_stock}")
 
 
-@bot.message_handler(commands=['stock'])
-def handle_stock_status(message):
-    if message.from_user.id != ADMIN_ID:
-        bot.send_message(message.chat.id, "❌ У вас нет доступа к этой команде.")
-        return
-
-    status = show_stock_status()
-    bot.send_message(message.chat.id, status)
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('clean'))
+# Каталог
+@bot.callback_query_handler(lambda c: c.data=='clean')
 def show_catalog(call):
-    user_chat_id = call.message.chat.id
-    # Удаляем главное меню
+    bot.delete_message(call.message.chat.id,call.message.message_id)
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    for pid,p in products_clean.items():
+        kb.add(types.InlineKeyboardButton(f"{p['name']} — {p['short_description']}",callback_data=f'product_{pid}'))
+    sent=bot.send_message(call.message.chat.id,'✨ Наш каталог готов для вас! Выберите товар ниже:',reply_markup=kb)
+    catalog_messages_ids[call.message.chat.id]=sent.message_id
+
+@bot.callback_query_handler(lambda c: c.data=='makeup')
+def show_makeup(call):
+    bot.answer_callback_query(call.id)
+    sent=bot.send_message(call.message.chat.id,'💄 Раздел *Декоративная косметика* скоро будет доступен!\n\n🔔 Следите за обновлениями!')
+    time.sleep(3)
+    bot.delete_message(call.message.chat.id,sent.message_id)
+
+@bot.callback_query_handler(lambda c: c.data.startswith('product_'))
+def show_product(call):
+    pid=call.data.split('_')[1]; p=products_clean.get(pid)
+    if not p: return bot.answer_callback_query(call.id,'❌ Нет')
+    stock=get_stock_from_db(pid)
+    price=f"{p['price']:,}".replace(',',' ')
+    text=(f"📦 <b>{p['name']}</b>\n\n{p['description']}\n\n"
+          f"💰 Цена: {price}₸\n🔢 В наличии: {stock} шт.\n")
     try:
-        bot.delete_message(user_chat_id, call.message.message_id)
-    except Exception as e:
-        print(f"Не удалось удалить главное меню: {e}")
-
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    for product_id, product in products_clean.items():
-        short = product.get('short_description', 'Нет описания')
-        button = types.InlineKeyboardButton(
-            text=f"{product['name']} — {short}",
-            callback_data=f"product_{product_id}"
-        )
-        markup.add(button)
-    msg = bot.send_message(call.message.chat.id, "✨ Наш каталог готов для вас! Выберите товар ниже:", reply_markup=markup)
-    catalog_messages_ids[user_chat_id] = msg.message_id
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('makeup'))
-def show_all_makeup_products(call):
-    bot.answer_callback_query(call.id)  # чтобы убрать "крутилку" загрузки
-    sent = bot.send_message(
-        call.message.chat.id,
-        "💄 Раздел *Декоративная косметика* скоро будет доступен!\n\n🔔 Следите за обновлениями!",
-        parse_mode='Markdown'
-    )
-    time.sleep(5)
-    try:
-        bot.delete_message(chat_id=call.message.chat.id, message_id=sent.message_id)
-    except Exception as e:
-        print(f"Не удалось удалить сообщение: {e}")
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("product_"))
-def show_product_card(call: CallbackQuery):
-    product_id = call.data.split("_")[1]
-    product = get_product_by_id(product_id)
-    if not product:
-        bot.answer_callback_query(call.id, "Товар не найден.")
-        return
-
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-
-    # Удаляем предыдущее сообщение
-    if user_id in last_product_messages:
-        try:
-            bot.delete_message(chat_id, last_product_messages[user_id])
-        except Exception as e:
-            print(f"Не удалось удалить старое сообщение: {e}")
-
-    # Данные из базы
-    photo = product['photo']
-    name = product['name']
-    description = product['description']
-    price = product['formatted_price']
-    stock = product['stock']
-
-    text = (
-        f"📦 <b>{name}</b>\n\n"
-        f"{description}\n\n"
-        f"💰 Цена: {price}₸\n"
-        f"🔢 В наличии: {stock} шт.\n\n"
-        f"Добавить этот товар в корзину?"
-    )
-
-    with open(photo, 'rb') as photo_file:
-        sent_msg = bot.send_photo(
-            chat_id,
-            photo_file,
-            caption=text,
-            parse_mode="HTML",
-            reply_markup=confirm_keyboard(product_id)
-        )
-
-    last_product_messages[user_id] = sent_msg.message_id
+        with open(p['photo'],'rb') as ph:
+            bot.send_photo(call.message.chat.id,ph,caption=text,parse_mode='HTML',reply_markup=confirm_keyboard(pid))
+    except:
+        bot.send_message(call.message.chat.id,text,parse_mode='HTML',reply_markup=confirm_keyboard(pid))
     bot.answer_callback_query(call.id)
 
+#Отмена добавления в корзину
+@bot.callback_query_handler(lambda c: c.data.startswith('cancel_'))
+def cancel_add(c):
+    uid = c.message.chat.id
+    prod_id = c.data.split('_', 1)[1]
+
+    # отвечаем, чтобы убрать «крутилку»
+    bot.answer_callback_query(c.id)
+
+    # удаляем карточку товара
+    try:
+        bot.delete_message(uid, c.message.message_id)
+    except:
+        pass
+
+# Добавление в корзину
+@bot.callback_query_handler(lambda c: c.data.startswith('add_'))
+def add_to_cart(call):
+    uid = call.message.chat.id
+    pid = call.data.split('_')[1]
+    bot.answer_callback_query(call.id)
+
+    # Получаем остаток
+    stock = get_stock_from_db(pid)
+    if stock <= 0:
+        if stock <= 0:
+            try:
+                bot.delete_message(uid, call.message.message_id)
+            except:
+                pass
+
+        no_msg=bot.send_message(uid, "❌ Товара больше нет в наличии.")
+        threading.Thread(
+            target=delete_after_delay,
+            args=(uid, no_msg.message_id, 3)
+        ).start()
+        return
+       
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'main_menu')
-def return_to_menu(call):
+    # Спрашиваем, сколько штук
+    msg = bot.send_message(uid, "🔢 Сколько штук вы хотите заказать?")
+    last_quantity_prompt[uid] = msg.message_id
+    bot.register_next_step_handler(msg, process_quantity, pid, call.message.message_id)
+
+
+def process_quantity(message, pid, product_msg_id):
+    uid = message.chat.id
+
+    # Удаляем запрос о количестве
+    try:
+        bot.delete_message(uid, last_quantity_prompt.get(uid, 0))
+        bot.delete_message(uid, message.message_id)
+    except:
+        pass
+
+    # Парсим количество
+    try:
+        qty = int(message.text)
+        if qty < 1:
+            raise ValueError
+    except ValueError:
+        error = bot.send_message(uid, "❌ Введите целое число больше нуля:")
+        last_quantity_prompt[uid] = error.message_id
+        bot.register_next_step_handler(error, process_quantity, pid, product_msg_id)
+        return
+
+    # Проверяем остаток
+    stock = get_stock_from_db(pid)
+    if qty > stock:
+        error = bot.send_message(uid, f"⚠️ На складе только {stock} шт. Введите меньшее количество:")
+        last_quantity_prompt[uid] = error.message_id
+        bot.register_next_step_handler(error, process_quantity, pid, product_msg_id)
+        return
+
+    # Уменьшаем остаток в БД
+    update_stock_in_db(pid, stock - qty)
+
+    # Добавляем в корзину
+    item = next((i for i in carts.get(uid, []) if i['product_id'] == pid), None)
+    if item:
+        item['quantity'] += qty
+    else:
+        p = products_clean[pid]
+        carts.setdefault(uid, []).append({
+            'product_id': pid,
+            'name': p['name'],
+            'price': p['price'],
+            'quantity': qty,
+            'photo': p['photo']
+        })
+
+    # Удаляем саму карточку товара (фото + текст)
+    try:
+        bot.delete_message(uid, product_msg_id)
+    except:
+        pass
+
+    # Подтверждение и кнопки “продолжить/в меню”
+    bot.send_message(
+        uid,
+        f"✅ Добавлено в корзину: {qty}шт. «{products_clean[pid]['name']}»\n\nНажмите на одну из кнопок ниже ⬇️",
+        reply_markup=post_add_keyboard()
+    )
+
+
+
+# 1) Просмотр корзины
+@bot.callback_query_handler(lambda c: c.data == 'cart')
+def show_cart(call):
+    uid = call.message.chat.id
+
+    # Удаляем старый просмотр (но не меню удаления)
+    for mid in cart_message_ids.get(uid, []):
+        try: bot.delete_message(uid, mid)
+        except: pass
+    cart_message_ids[uid] = []
+
+    # Удаляем только главное меню
+    try:
+        bot.delete_message(uid, call.message.message_id)
+    except: pass
+
+    cart = carts.get(uid, [])
+    if not cart:
+        sent = bot.send_message(uid, "🛒 Ваша корзина пуста.", reply_markup=back_to_menu_keyboard())
+        cart_message_ids[uid].append(sent.message_id)
+        return
+
+    # Строим красивое сообщение
+    text = "🧺 *Корзина товаров:*\n"
+    text += "━━━━━━━━━━━━━━━━━━━\n"
+    total = 0
+    for i, item in enumerate(cart, start=1):
+        name = item['name']
+        quantity = item['quantity']
+        price = item['price']
+        subtotal = price * quantity / 1000
+        total += subtotal
+
+        text += (
+            f"🔹 *{i}. {name}*\n"
+            f"   📦 Кол-во: {quantity} шт.\n"
+            f"   💰 Цена: {price} тг/шт\n"
+            f"   🧾 Сумма: {subtotal:.3f} тг\n"
+            "-------------------------\n"
+        )
+
+    text += f"💵 *Общая сумма: {total:.3f} тг*\n"
+    text += "━━━━━━━━━━━━━━━━━━━\n"
+    text += "✅ Готовы оформить заказ?"
+
+    sent = bot.send_message(uid, text, parse_mode='Markdown', reply_markup=confirm_keyboard())
+    cart_message_ids[uid].append(sent.message_id)
+
+# 2) Меню редактирования (не трогаем просмотр)
+@bot.callback_query_handler(lambda c: c.data == 'edit_cart')
+def edit_cart(call):
+    uid = call.message.chat.id
+
+    # Удаляем старое меню удаления
+    if uid in edit_message_ids:
+        try: bot.delete_message(uid, edit_message_ids[uid])
+        except: pass
+
+    cart = carts.get(uid, [])
+    if not cart:
+        sent = bot.send_message(uid, "🛒 Ваша корзина пуста.", reply_markup=back_to_menu_keyboard())
+        edit_message_ids[uid] = sent.message_id
+        return
+
+    kb = types.InlineKeyboardMarkup()
+    for idx, it in enumerate(cart):
+        kb.add(types.InlineKeyboardButton(
+            f"❌ Удалить {it['name']} ({it['quantity']} шт.)",
+            callback_data=f'remove_{idx}'
+        ))
+    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data='cart'))
+
+    sent = bot.send_message(uid, "Выберите товар для удаления:", reply_markup=kb)
+    edit_message_ids[uid] = sent.message_id
+
+# 3) Удаление товара
+@bot.callback_query_handler(lambda c: c.data.startswith('remove_'))
+def remove_item(call):
+    uid = call.message.chat.id
+    idx = int(call.data.split('_')[1])
+    cart = carts.get(uid, [])
+
+    # Проверка
+    if idx < 0 or idx >= len(cart):
+        return bot.answer_callback_query(call.id, "❌ Товар не найден")
+
+    # Удаляем товар и возвращаем на склад
+    it = cart.pop(idx)
+    stock = get_stock_from_db(it['product_id'])
+    update_stock_in_db(it['product_id'], stock + it['quantity'])
+    bot.answer_callback_query(call.id, "✅ Удалено")
+
+    # Удаляем и просмотр, и меню удаления
+    for mid in cart_message_ids.get(uid, []):
+        try: bot.delete_message(uid, mid)
+        except: pass
+    cart_message_ids[uid] = []
+
+    if uid in edit_message_ids:
+        try: bot.delete_message(uid, edit_message_ids[uid])
+        except: pass
+        del edit_message_ids[uid]
+
+    # Показываем обновлённую корзину и сразу меню редактирования
+    show_cart(call)
+  
+@bot.callback_query_handler(func=lambda call: call.data == 'checkout')
+def start_checkout(call):
     user_chat_id = call.message.chat.id
-    # Удаляем текущее сообщение с кнопками
+    
+    if user_chat_id not in carts or not carts[user_chat_id]:
+        bot.send_message(user_chat_id, "Ваша корзина пуста!")
+        return
+    # Удалим сообщение с корзиной
     try:
         bot.delete_message(user_chat_id, call.message.message_id)
     except Exception as e:
-        print(f"Ошибка удаления текущего сообщения: {e}")
+        print("Не удалось удалить сообщение с корзиной:", e)
 
-    # Удаляем все карточки каталога
-    if user_chat_id in catalog_messages_ids:
+    
+    msg=bot.send_message(user_chat_id, "Введите ваше ФИО:")
+    bot.register_next_step_handler(msg, process_name,msg.message_id)
+
+def process_name(message,question_msg_id):
+    user_chat_id = message.chat.id
+    try:
+        bot.delete_message(user_chat_id, question_msg_id)  # удалить "Введите ФИО"
+        bot.delete_message(user_chat_id, message.message_id)  # удалить введённый текст
+    except:
+        pass
+
+    user_states[user_chat_id] = {'name': message.text}
+    
+    
+    
+    msg=bot.send_message(user_chat_id, "Введите ваш адрес доставки:")
+    bot.register_next_step_handler(message, process_address, msg.message_id)
+
+def process_address(message, question_msg_id):
+    user_chat_id = message.chat.id
+    try:
+        bot.delete_message(user_chat_id, question_msg_id)  # удалить "Введите адрес"
+        bot.delete_message(user_chat_id, message.message_id)  # удалить ответ
+    except:
+        pass
+    
+    user_states[user_chat_id]['address'] = message.text
+    
+    msg=bot.send_message(user_chat_id, "Введите ваш номер телефона:")
+    bot.register_next_step_handler(message, process_phone, msg.message_id)
+
+
+def process_phone(message, question_msg_id):
+    user_chat_id = message.chat.id
+
+    try:
+        bot.delete_message(user_chat_id, question_msg_id)
+        bot.delete_message(user_chat_id, message.message_id)
+    except:
+        pass
+
+    try:
+        phone = message.text
+        if not phone.isdigit() or not (7 <= len(phone) <= 15):
+            msg = bot.send_message(user_chat_id, "❌ Пожалуйста, введите корректный номер телефона (только цифры).")
+            bot.register_next_step_handler(msg, process_phone, msg.message_id)
+            return
+        user_states[user_chat_id]['phone'] = phone
+
+        name = user_states[user_chat_id]['name']
+        address = user_states[user_chat_id]['address']
+
+        cart_items = carts[user_chat_id]
+        total = sum(item['price'] * item['quantity'] / 1000 for item in cart_items)
+
+        order_id = save_order(name, address, phone, cart_items, total)
+
+        order_items = []
+        for item in cart_items:
+            item_total = item['price'] * item['quantity'] / 1000
+            order_items.append(
+                f"{item['name']} - {item['quantity']} шт. = {item_total:.3f}тг"
+            )
+
+        order_text = (
+            f"🛒 Новый заказ #{order_id}\n"
+            f"👤 Клиент: {name}\n"
+            f"📞 Телефон: {phone}\n"
+            f"🏠 Адрес: {address}\n\n"
+            f"📦 Состав заказа:\n" + "\n".join(order_items) + "\n\n"
+            f"💵 Итого: {total:.3f}тг"
+        )
+
+        bot.send_message(GROUP_CHAT_ID, order_text)
+
+        bot.send_message(
+            user_chat_id,
+            f"✅ Ваш заказ #{order_id} оформлен!\n"
+            f"Мы свяжемся с вами по номеру {phone} для подтверждения.\n\n"
+            "Для нового заказа нажмите /start",
+            reply_markup=types.ReplyKeyboardRemove()
+        )
+
+        del carts[user_chat_id]
+        del user_states[user_chat_id]
+
+    except Exception as e:
+        bot.send_message(user_chat_id, f"Произошла ошибка: {e}\nПожалуйста, попробуйте ещё раз.")
+
+
+# Возврат в главное меню
+@bot.callback_query_handler(lambda c: c.data == 'main_menu')
+def back_to_main(call):
+    uid = call.message.chat.id
+
+    # Удаляем текущее сообщение (кнопки «главного меню» или корзины)
+    try:
+        bot.delete_message(uid, call.message.message_id)
+    except:
+        pass
+
+    # Удаляем сообщение с каталогом, если оно было сохранено
+    if uid in catalog_messages_ids:
         try:
-            bot.delete_message(user_chat_id, catalog_messages_ids[user_chat_id])
-            del catalog_messages_ids[user_chat_id]
-        except Exception as e:
-            print(f"Ошибка удаления каталога: {e}")
+            bot.delete_message(uid, catalog_messages_ids[uid])
+        except:
+            pass
+        del catalog_messages_ids[uid]
 
-    # Отправляем главное меню
+    # Отправляем главное меню заново
     bot.send_message(
-        user_chat_id,
+        uid,
         "🏠 Главное меню:",
         reply_markup=main_menu_keyboard()
     )
 
-
+#Продолжение покупок
 @bot.callback_query_handler(func=lambda call: call.data == 'continue_shopping')
 def continue_shopping(call):
     chat_id = call.message.chat.id
@@ -702,363 +786,7 @@ def continue_shopping(call):
 
     threading.Thread(target=delete_later, args=(chat_id, sent_msg.message_id)).start()
 
-
-   
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('add_'))
-def add_to_cart(call):
-    chat_id = call.message.chat.id
-    product_id = call.data.split('_')[1]
-    user_chat_id = call.message.chat.id
-
-    # Получаем товар
-    product = products_clean.get(product_id)
-    if not product:
-        bot.answer_callback_query(call.id, "❌ Товар не найден.")
-        return
-
-    current_stock = get_stock(product_id)
-    if current_stock <= 0:
-        # Удаляем сообщение с кнопками
-        try:
-            bot.delete_message(user_chat_id, call.message.message_id)
-        except:
-            pass
-        
-        # Показываем "нет в наличии"
-        sent_msg = bot.send_message(chat_id, "❌ Товара больше нет в наличии.")
-
-        # Удаляем через 3 секунды
-        def delete_later(chat_id, msg_id):
-            time.sleep(3)
-            try:
-                bot.delete_message(chat_id, msg_id)
-            except:
-                pass
-
-        threading.Thread(target=delete_later, args=(chat_id, sent_msg.message_id)).start()
-        
-        return  # ⚠️ Важно: тут выходим из функции, чтобы дальше ничего не выполнялось!
-
-    # Если товар есть в наличии — продолжаем
-    try:
-        bot.delete_message(user_chat_id, call.message.message_id)
-    except:
-        pass
-
-    msg = bot.send_message(user_chat_id, "Сколько штук вы хотите заказать? Введите число:")
-    last_quantity_prompt[user_chat_id] = msg.message_id
-    bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
-
-
-def process_quantity(message, product_id, msg_id):
-    try:
-        user_chat_id = message.chat.id
-        quantity = int(message.text)
-        
-        if quantity <= 0:
-            raise ValueError
-        
-        product = products_clean[product_id]
-        current_stock = get_stock(product_id)  # Получаем текущий остаток
-        
-        # Проверка наличия
-        if current_stock < quantity:
-            # Удаляем предыдущее сообщение, если есть
-            if user_chat_id in last_quantity_prompt:
-                try:
-                    bot.delete_message(user_chat_id, message.message_id)
-                except:
-                    pass
-                # Удаляем предыдущее сообщение "Введите количество", если есть
-                if user_chat_id in last_quantity_prompt:
-                    try:
-                        bot.delete_message(user_chat_id, last_quantity_prompt[user_chat_id])
-                    except:
-                        pass
-                    last_quantity_prompt.pop(user_chat_id, None)
-
-            msg = bot.send_message(
-                user_chat_id,
-                f"❌ На складе только {current_stock} шт. товара. Введите меньшее количество:"
-            )
-            last_quantity_prompt[user_chat_id] = msg.message_id
-            bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
-            return
-        
-        # Удаляем сообщения
-        try:
-            bot.delete_message(user_chat_id, msg_id)
-            bot.delete_message(user_chat_id, message.message_id)
-        except:
-            pass
-        
-        # Добавляем в корзину
-        if user_chat_id not in carts:
-            carts[user_chat_id] = []
-        
-        # Проверяем, есть ли уже такой товар в корзине
-        item_exists = False
-        for item in carts[user_chat_id]:
-            if item['product_id'] == product_id:
-                item['quantity'] += quantity
-                item_exists = True
-                break
-        
-        if not item_exists:
-            carts[user_chat_id].append({
-                'photo': product['photo'],
-                'name': product['name'],
-                'price': product['price'],
-                'quantity': quantity,
-                'product_id': product_id
-            })
-        # ⬇️ Уменьшаем остаток
-        decrease_stock(product_id, quantity)
-        
-        bot.send_message(
-            user_chat_id,
-            f"✅ Добавлено {quantity} шт. {product['name']} в корзину!",
-            reply_markup=post_add_keyboard()
-        )
-        
-    except ValueError:
-        user_chat_id = message.chat.id
-        try:
-            bot.delete_message(user_chat_id, message.message_id)
-        except:
-            pass
-         
-         # Удаляем предыдущее сообщение, если есть
-        if user_chat_id in last_quantity_prompt:
-            try:
-                bot.delete_message(user_chat_id, last_quantity_prompt[message.chat.id])
-            except:
-                pass
-            last_quantity_prompt.pop(user_chat_id, None)
-        
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите корректное число больше нуля!")
-        last_quantity_prompt[message.chat.id] = msg.message_id
-        bot.register_next_step_handler(msg, process_quantity, product_id, msg.message_id)
-
-
-@bot.callback_query_handler(func=lambda call: call.data == 'cart')
-def show_cart(call):
-    user_chat_id = call.message.chat.id
-
-    # Удаляем главное меню
-    try:
-        bot.delete_message(user_chat_id, call.message.message_id)
-    except Exception as e:
-        print(f"Не удалось удалить главное меню: {e}")
-
-    if user_chat_id not in carts or not carts[user_chat_id]:
-        bot.send_message(
-            user_chat_id,
-            "🛒 Ваша корзина пуста.",
-            reply_markup=get_back_to_menu_keyboard()
-        )
-        return
-
-    # Удаляем старые сообщения, если нужно
-    if user_chat_id in cart_message_ids:
-        for msg_id in cart_message_ids[user_chat_id]:
-            try:
-                bot.delete_message(user_chat_id, msg_id)
-            except:
-                pass
-        cart_message_ids[user_chat_id].clear()
-    else:
-        cart_message_ids[user_chat_id] = []
-
-    # Формируем сообщение
-    text = "🛒 *Ваша корзина:*\n\n"
-    total = 0
-    for item in carts[user_chat_id]:
-        item_total = item['price'] * item['quantity'] / 1000
-        total += item_total
-        text += (
-            f"📦 *{item['name']}*\n"
-            f"🔢 Количество: {item['quantity']} шт.\n"
-            f"💰 Цена: {item_total:.3f} тг\n\n"
-        )
-    text += f"💳 *Итого: {total:.3f} тг*"
-
-    # Кнопки
-    markup = confirm_keyboard()  # 'Оформить', 'Редактировать', 'Назад в меню'
-
-    sent = bot.send_message(
-        user_chat_id,
-        text,
-        parse_mode='Markdown',
-        reply_markup=markup
-    )
-    cart_message_ids[user_chat_id].append(sent.message_id)
-
-@bot.callback_query_handler(func=lambda call: call.data == 'checkout')
-def start_checkout(call):
-    user_chat_id = call.message.chat.id
-    
-    if user_chat_id not in carts or not carts[user_chat_id]:
-        bot.send_message(user_chat_id, "Ваша корзина пуста!")
-        return
-    
-    bot.send_message(user_chat_id, "Введите ваше ФИО:")
-    bot.register_next_step_handler(call.message, process_name)
-
-def process_name(message):
-    user_chat_id = message.chat.id
-    user_states[user_chat_id] = {'name': message.text}
-    
-    
-    
-    bot.send_message(user_chat_id, "Введите ваш адрес доставки:")
-    bot.register_next_step_handler(message, process_address)
-
-def process_address(message):
-    user_chat_id = message.chat.id
-    user_states[user_chat_id]['address'] = message.text
-    
-    bot.send_message(user_chat_id, "Введите ваш номер телефона:")
-    bot.register_next_step_handler(message, process_phone)
-
-
-def process_phone(message):
-    try:
-        user_chat_id = message.chat.id
-        phone = message.text
-        user_states[user_chat_id]['phone'] = phone
-        
-        # Генерируем номер заказа
-        order_number = get_order_number() + 1
-        update_order_number(order_number)
-        
-        # Формируем сообщение для администратора
-        order_items = []
-        total = 0
-        for item in carts[user_chat_id]:
-            item_total = item['price'] * item['quantity'] / 1000
-            total += item_total
-            order_items.append(
-                f"{item['name']} - {item['quantity']} шт. = {item_total:.3f}тг"
-            )
-            
-        
-        order_text = (
-            f"🛒 Новый заказ #{order_number}\n"
-            f"👤 Клиент: {user_states[user_chat_id]['name']}\n"
-            f"📞 Телефон: {phone}\n"
-            f"🏠 Адрес: {user_states[user_chat_id]['address']}\n\n"
-            f"📦 Состав заказа:\n" + "\n".join(order_items) + "\n\n"
-            f"💵 Итого: {total:.3f}тг"
-        )
-        
-        # Отправляем администратору
-        bot.send_message(GROUP_CHAT_ID, order_text)
-        
-        # Отправляем клиенту
-        bot.send_message(
-            user_chat_id,
-            f"✅ Ваш заказ #{order_number} оформлен!\n"
-            f"Мы свяжемся с вами по номеру {phone} для подтверждения.\n\n"
-            "Для нового заказа нажмите /start",
-            reply_markup=types.ReplyKeyboardRemove()
-        )
-        
-        # Очищаем корзину и состояние
-        if user_chat_id in carts:
-            del carts[user_chat_id]
-        if user_chat_id in user_states:
-            del user_states[user_chat_id]
-            
-    except Exception as e:
-        bot.send_message(user_chat_id, f"Произошла ошибка: {e}\nПожалуйста, попробуйте ещё раз.")
-
-@bot.callback_query_handler(func=lambda call: call.data == 'edit_cart')
-def edit_cart(call):
-    user_chat_id = call.message.chat.id
-    
-    if user_chat_id not in carts or not carts[user_chat_id]:
-        bot.send_message(user_chat_id, "Ваша корзина пуста!")
-        return
-    
-    keyboard = types.InlineKeyboardMarkup()
-    for index, item in enumerate(carts[user_chat_id]):
-        keyboard.add(types.InlineKeyboardButton(
-            f"❌ Удалить {item['name']} ({item['quantity']} шт.)",
-            callback_data=f'remove_{index}'
-        ))
-    
-    keyboard.add(types.InlineKeyboardButton("↩️ Назад", callback_data='cart'))
-    
-    bot.send_message(
-        user_chat_id,
-        "Выберите товар для удаления:",
-        reply_markup=keyboard
-    )
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('remove_'))
-def remove_item(call):
-    user_chat_id = call.message.chat.id
-    index = int(call.data.split('_')[1])
-    
-    if user_chat_id in carts and 0 <= index < len(carts[user_chat_id]):
-        removed_item = carts[user_chat_id].pop(index)
-        
-        # Удаляем сообщение с кнопками удаления
-        try:
-            bot.delete_message(user_chat_id, call.message.message_id)
-        except:
-            pass
-        
-        # Возвращаем товар на склад
-        product_id = removed_item['product_id']
-        current_stock = get_stock(product_id)
-        update_stock_in_db(product_id, current_stock + removed_item['quantity'])
-        
-        # Если корзина пуста
-        if len(carts[user_chat_id]) == 0:
-            del carts[user_chat_id]  # Удаляем пустую корзину
-
-             # Удаляем ещё одно сообщение (предыдущее), если оно осталось
-            try:
-                bot.delete_message(user_chat_id, call.message.message_id - 1)
-            except:
-                pass
-
-            bot.send_message(
-                user_chat_id,
-                "🛒 Ваша корзина теперь пуста.",
-                reply_markup=get_back_to_menu_keyboard()
-            )
-        else:
-            # Показываем обновленную корзину
-            show_cart(call)
-    else:
-        bot.answer_callback_query(call.id, "❌ Товар не найден в корзине.")
-
-@bot.callback_query_handler(func=lambda call: call.data == 'main_menu')
-def back_to_main(call):
-    user_chat_id = call.message.chat.id
-
-     # Удаляем все сообщения корзины
-    if user_chat_id in cart_message_ids:
-        for msg_id in cart_message_ids[user_chat_id]:
-            try:
-                bot.delete_message(user_chat_id, msg_id)
-            except:
-                pass
-        del cart_message_ids[user_chat_id]
-
-    start(call.message)
-
-
-
-if __name__ == "__main__":
-    print(f"Бот запущен. Режим обслуживания: {'ВКЛ' if BOT_MAINTENANCE else 'ВЫКЛ'}")
-    while True:
-        try:
-            bot.polling(none_stop=True)
-        except Exception as e:
-            print(f"Ошибка: {e}. Перезапуск через 10 сек...")
-            time.sleep(10)
+# ==================== Запуск бота ====================
+if __name__ == '__main__':
+    init_db()
+    bot.infinity_polling()
