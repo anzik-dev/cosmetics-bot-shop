@@ -29,3 +29,14 @@ This project is based on a template originally created by Hawra al Ramadan (MIT 
 - Git
 - telebot
 Проект создавался как практичекий и одновременно для продажи компании, которая собиралась продовать космеику.
+
+## Скриншоты сайта
+screenshots\Снимок экрана 2026-06-30 134640.png
+screenshots\Снимок экрана 2026-06-30 134659.png
+screenshots\Снимок экрана 2026-06-30 134712.png
+screenshots\Снимок экрана 2026-06-30 134719.png
+screenshots\Снимок экрана 2026-06-30 134728.png
+screenshots\Снимок экрана 2026-06-30 134739.png
+screenshots\Снимок экрана 2026-06-30 134808.png
+screenshots\Снимок экрана 2026-06-30 134818.png
+screenshots\Снимок экрана 2026-06-30 134843.png
