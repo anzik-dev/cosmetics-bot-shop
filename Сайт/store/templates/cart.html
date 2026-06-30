@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Корзина{% endblock %}
+
+{% block content %}
+
+
+<section class="section-header">
+  <h2>🛒 Ваша корзина</h2>
+</section>
+
+{% if cart_items %}
+<div class="cart-container">
+  {% if error_message %}
+  <div class="error-message">{{ error_message }}</div>
+  {% endif %}
+
+  {% for item in cart_items %}
+  <div class="cart-item">
+    <img src="{{ item.product.main_image.url }}" alt="{{ item.product.name }}" class="product-image">
+    <div class="item-info">
+      <h3>{{ item.product.name }}</h3>
+      <p>{{ item.product.short_description }}</p>
+      {% if item.product.discount > 0 %}
+      <p>
+        <strong>Цена:</strong>
+        <span class="old-price" style="text-decoration: line-through; margin-right: 8px; font-size: 16px;">{{
+          item.product.price|floatformat:0 }} ₸</span>
+        <span class="discounted-price" style="color: #e53935; font-weight: bold; font-size: 18px;">{{
+          item.discounted_price|floatformat:0 }} ₸</span>
+      </p>
+      {% else %}
+      <p><strong>Цена:</strong> {{ item.product.price|floatformat:0 }} ₸</p>
+      {% endif %}
+
+      <div class="quantity-controls">
+        <form method="post" action="{% url 'update_cart' item.product.id %}">
+          {% csrf_token %}
+          <button type="submit" name="action" value="decrease" class="cart-btn">−</button>
+          <span class="cart-quantity">{{ item.quantity }}</span>
+          <button type="submit" name="action" value="increase" class="cart-btn">+</button>
+        </form>
+      </div>
+      <p><strong>Сумма:</strong> {{ item.item_total|floatformat:2 }} ₸</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="bonus-summary">
+  <p><strong>Сумма товаров:</strong> {{ total_price|floatformat:2 }} ₸</p>
+  {% if discount_amount > 0 %}
+  <p><strong>Скидка по карте:</strong> -{{ discount_amount|floatformat:2 }} ₸</p>
+  {% endif %}
+  <p><strong>Доступно бонусов:</strong> {{ bonus_points|floatformat:2 }} ₸</p>
+  {% if use_bonus and bonus_to_use > 0 %}
+  <p id="bonus-used" style="display: block;"><strong>Списано бонусов:</strong> -{{ bonus_to_use|floatformat:2 }} ₸</p>
+  {% else %}
+  <p id="bonus-used" style="display: none;"></p>
+  {% endif %}
+  <p class="final-price"><strong>Итого:</strong> <span id="final-price">{{ final_price|floatformat:2 }}</span> ₸</p>
+</div>
+
+{% if user.is_authenticated %}
+<div class="checkout-section">
+  <form method="post" action="{% url 'checkout' %}">
+    {% csrf_token %}
+    <!-- Выбор адреса -->
+    <div class="address-selection">
+      <label for="address">Выберите адрес доставки:</label>
+      <select name="address" id="address" required>
+        {% for adr in addresses %}
+        <option value="{{ adr.id }}">{{ adr.city }}, {{ adr.address }}</option>
+        {% empty %}
+        <option disabled>Адресов пока нет. Добавьте в профиле.</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="bonus-toggle">
+      <label class="switch">
+        <input type="checkbox" id="useBonusToggle" {% if use_bonus %}checked{% endif %}>
+        <span class="slider"></span>
+      </label>
+      <span>Использовать бонусы</span>
+    </div>
+
+    <!-- Кнопка теперь в том же контейнере и по центру -->
+    <button type="submit" class="order">Оформить заказ</button>
+  </form>
+</div>
+
+{% else %}
+<div class="checkout-section">
+  <a href="{% url 'login' %}" class="order">Войдите, чтобы оформить заказ</a>
+</div>
+{% endif %}
+</div>
+
+{% else %}
+<p class="empty-cart-msg">🛍️ Ваша корзина пока пуста.</p>
+{% endif %}
+
+
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('useBonusToggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', () => {
+      fetch("{% url 'toggle_bonus' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ use_bonus: toggle.checked })
+      })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('final-price').textContent = data.final_price;
+
+          const bonusUsedElem = document.getElementById('bonus-used');
+          if (data.bonus_to_use && parseFloat(data.bonus_to_use) > 0) {
+            bonusUsedElem.textContent = `Списано бонусов: -${data.bonus_to_use} ₸`;
+            bonusUsedElem.style.display = 'block';
+          } else {
+            bonusUsedElem.style.display = 'none';
+          }
+        });
+    });
+  }); 
+</script>
+
+{% endblock %}

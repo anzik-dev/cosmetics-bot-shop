@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="form-container">
+  <div class="card">
+    <h2 class="form-title">Зарегистрироваться</h2>
+    <p class="form-subtitle">Создайте профиль для отслеживания заказов</p>
+    <form method="post">
+        {% csrf_token %}
+        <p>
+            <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+            {{ form.first_name }}
+            {{ form.first_name.errors }}
+        </p>
+        
+        <p>
+            <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+            {{ form.last_name }}
+            {{ form.last_name.errors }}
+        </p>
+
+        <p>{{ form.email.label_tag }} {{ form.email }}</p>
+        <p>{{ form.password1.label_tag }} {{ form.password1 }}</p>
+        <p>{{ form.password2.label_tag }} {{ form.password2 }}</p>
+        <button type="submit" class="btn-primary">Зарегистрироваться</button>
+    </form>
+
+
+    <p class="form-link">Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
+  </div>
+</div>
+<div class="social-login">
+    <p>Или зарегистрируйтесь через:</p>
+    <a href="#" class="google-btn">
+        <img src="{% static 'images_for_accounts/google-icon.png' %}" alt="Google"> Войти через Google
+    </a>
+    <a href="#" class="apple-btn">
+        <img src="{% static 'images_for_accounts/apple-icon.png' %}" alt="Apple"> Войти через Apple
+    </a>
+</div>
+
+{% endblock %}
+
+

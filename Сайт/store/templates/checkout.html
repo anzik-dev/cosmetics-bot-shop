@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Оформление заказа{% endblock %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 0 auto; padding: 30px; background-color: #ffc0cb; border-radius: 20px;">
+    <h2 style="text-align: center; color: #000;">Оформление заказа</h2>
+    <p style="text-align: center; margin-top: 20px;">Здесь будет форма оплаты или подтверждение заказа.</p>
+
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="{% url 'cart' %}" style="color: #000">⬅ Вернуться в корзину</a>
+    </div>
+</div>
+{% endblock %}

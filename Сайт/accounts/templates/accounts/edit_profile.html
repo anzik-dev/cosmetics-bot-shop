@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .btn-submit {
+        background-color: #f7acad;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        margin-top: 10px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .btn-submit:hover {
+        background-color: #c08788;
+    }
+    .password_change {
+  background-color: #f7acad;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.password_change:hover {
+  background-color: #c08788;
+}
+</style>
+
+<div class="profile-form-container"
+    style="max-width: 500px; margin: 0 auto; padding: 20px; background-color: #fccdcd; border-radius: 20px;">
+    <h2 style="text-align: center; color: #000;">Редактировать профиль</h2>
+    <div style="text-align: center; margin-top: 10px;">
+   
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn-submit">Сохранить</button>
+    </form>
+    <div style="text-align: center; margin-top: 10px;">
+        <a href="{% url 'password_change' %}" style="text-decoration: none;">
+            <button class="password_change">
+                Сменить пароль
+            </button>
+        </a>
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="{% url 'profile' %}" style="color: #555;">⬅ Назад к профилю</a>
+    </div>
+</div>
+
+{% endblock %}

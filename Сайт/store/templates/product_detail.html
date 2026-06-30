@@ -1,0 +1,491 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="section-p1">
+  <a href="{% url 'category_view' product.category %}" class="back-button"><strong>← Назад к каталогу</strong></a>
+
+
+  <div class="product-detail-container">
+    <div class="image-gallery">
+      <div class="gallery-wrapper">
+        <button class="gallery-arrow left" onclick="prevImage()">&#10094;</button>
+        <img id="main-image" src="{{ product.main_image.url }}" alt="{{ product.name }}">
+        <button class="gallery-arrow right" onclick="nextImage()">&#10095;</button>
+      </div>
+      <div class="thumbnails" style="display:none;">
+        <img src="{{ product.main_image.url }}">
+        {% for image in product.images.all %}
+        <img src="{{ image.image.url }}">
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="product-info">
+      <h2>{{ product.name }}</h2>
+      <p style="font-size: 120%;">{{ product.description }}</p>
+      <p style="font-size: 120%;">В наличии: {{ product.stock }} шт.</p>
+      {% if product.discount > 0 %}
+      <p class="old-price" style="text-decoration: line-through; font-size: 150%">{{ product.price }} ₸</p>
+      <p class="discounted-price" style="color: #e53935; font-size: 150%">{{ product.get_discounted_price|floatformat:2 }} ₸</p>
+      <p class="discount-percent"
+        style="background-color: #f7d0ab; color: white; padding: 4px 8px; border-radius: 8px; font-size: 120%; font-weight: bold; margin-top: 4px; display: inline-block;">
+        Скидка {{ product.discount|floatformat:0 }}%</p>
+      {% else %}
+      <p class="normal-price" style="font-size: 150%">{{ product.price }} ₸</p>
+      {% endif %}
+
+      <form class="cart-form" data-product-id="{{ product.id }}">
+        {% csrf_token %}
+        {% if quantity > 0 %}
+        <div class="in-cart">
+          <button type="button" class="cart-btn minus">−</button>
+          <span class="cart-quantity">В корзине: {{ quantity }}</span>
+          <button type="button" class="cart-btn plus">+</button>
+        </div>
+        {% else %}
+        <button type="button" class="add-to-cart-btn">Добавить в корзину</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="section-p1 review-section">
+  <h2>Отзывы</h2>
+  <div class="review-grid">
+    <!-- Левая колонка: отзывы -->
+    <div class="review-list">
+      {% if reviews %}
+      {% for review in reviews %}
+      <div class="review-block">
+        <div class="review-header">
+          <strong>{{ review.user.first_name }} {{ review.user.last_name }}</strong>
+          <div class="review-stars">
+            {% for i in "12345" %}
+            {% if forloop.counter <= review.rating %} <span style="color: #f7acad;">&#9733;</span>
+              {% else %}
+              <span style="color: #ccc;">&#9733;</span>
+              {% endif %}
+              {% endfor %}
+          </div>
+        </div>
+        <p class="text">{{ review.text }}</p>
+        <small class="date">{{ review.created_at|date:"d.m.Y H:i" }}</small>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p>Пока никто не оставил отзывов.</p>
+      {% endif %}
+    </div>
+
+    <!-- Правая колонка: форма -->
+    <div class="review-form-wrapper">
+      {% if user.is_authenticated %}
+      <h3>Оставить отзыв</h3>
+      <form method="post" class="review-form">
+        {% csrf_token %}
+        <label for="{{ form.text.id_for_label }}">Отзыв:</label>
+        {{ form.text }}
+        
+        <div class="rating-stars">
+          {% for i in "54321" %}
+          <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}">
+          <label for="star{{ i }}">&#9733;</label>
+          {% endfor %}
+        </div>
+
+
+        <button type="submit">Отправить</button>
+      </form>
+      {% else %}
+      <p>Чтобы оставить отзыв, <a href="{% url 'login' %}">войдите в аккаунт</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+
+
+<script>
+  // Галерея изображений
+    const images = Array.from(document.querySelectorAll('.thumbnails img'));
+    let index = 0;
+
+    function showImage(i) {
+      const main = document.getElementById('main-image');
+      index = (i + images.length) % images.length;
+      main.src = images[index].src;
+    }
+
+    function prevImage() {
+      showImage(index - 1);
+    }
+
+    function nextImage() {
+      showImage(index + 1);
+    }
+
+    // Работа с корзиной
+    document.querySelectorAll('.cart-form').forEach(form => {
+      const productId = form.dataset.productId;
+
+      form.querySelectorAll('.cart-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.classList.contains('plus') ? 'increase' : 'decrease';
+          sendUpdate(action);
+        });
+      });
+
+      const addBtn = form.querySelector('.add-to-cart-btn');
+      if (addBtn) {
+        addBtn.addEventListener('click', () => sendUpdate('add'));
+      }
+
+      function sendUpdate(action) {
+        fetch(`/cart/update/${productId}/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({ action })
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.quantity > 0) {
+              form.innerHTML = `
+            <div class="in-cart">
+              <button type="button" class="cart-btn minus">−</button>
+              <span class="cart-quantity">В корзине: ${data.quantity}</span>
+              <button type="button" class="cart-btn plus">+</button>
+            </div>
+          `;
+              // Повторно добавляем обработчики к новым кнопкам
+              form.querySelector('.minus').addEventListener('click', () => sendUpdate('decrease'));
+              form.querySelector('.plus').addEventListener('click', () => sendUpdate('increase'));
+            }
+          });
+      }
+    });
+
+
+  /*Отзывы*/
+  document.addEventListener('DOMContentLoaded', function () {
+      const stars = document.querySelectorAll('.star');
+      let selectedRating = parseInt(document.getElementById('id_rating').value) || 0;
+
+      function highlightStars(rating) {
+        stars.forEach(star => {
+          const value = parseInt(star.getAttribute('data-value'));
+          if (value <= rating) {
+            star.classList.add('active');
+          } else {
+            star.classList.remove('active');
+          }
+        });
+      }
+
+      highlightStars(selectedRating); // при загрузке
+
+      stars.forEach(star => {
+        const value = parseInt(star.getAttribute('data-value'));
+
+        star.addEventListener('mouseover', () => highlightStars(value));
+        star.addEventListener('mouseout', () => highlightStars(selectedRating));
+
+        star.addEventListener('click', () => {
+          selectedRating = value;
+          document.getElementById('id_rating').value = value;
+          highlightStars(selectedRating);
+        });
+      });
+    });
+</script>
+
+<style>
+  .back-button {
+    display: inline-block;
+    margin-bottom: 20px;
+    font-size: 18px;
+    text-decoration: none;
+    color: #fff;
+    background-color: #f7acad;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: 0.3s;
+  }
+
+  .back-button:hover {
+    background-color: #c08788;
+  }
+
+   /* ОБНОВЛЕННЫЕ СТИЛИ ДЛЯ ГАЛЕРЕИ */
+  .gallery-wrapper {
+    position: relative;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .gallery-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    border: none;
+    cursor: pointer;
+    z-index: 2;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Фиксированный размер кнопок */
+    width: 40px;
+    height: 40px;
+    font-size: 24px;
+    /* Центрирование содержимого */
+    padding: 0;
+  }
+
+  .gallery-arrow.left {
+    left: 10px;
+  }
+
+  .gallery-arrow.right {
+    right: 10px;
+  }
+
+  /* Адаптация для мобильных */
+  @media screen and (max-width: 600px) {
+    .gallery-arrow {
+      width: 30px;
+      height: 30px;
+      font-size: 18px;
+    }
+    
+    .gallery-arrow.left {
+      left: 5px;
+    }
+    
+    .gallery-arrow.right {
+      right: 5px;
+    }
+  }
+
+  /* Остальные стили остаются без изменений */
+  #main-image {
+    width: 100%;
+    max-height: 500px;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .product-info {
+    text-align: center;
+  }
+
+  .product-info h2 {
+    font-size: 26px;
+    margin-bottom: 12px;
+  }
+
+  .product-info p {
+    font-size: 16px;
+    margin: 10px 0;
+  }
+
+  .cart-btn,
+  .add-to-cart-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background-color: #f7acad;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .cart-btn:hover,
+  .add-to-cart-btn:hover {
+    background-color: #c08788;
+  }
+
+  .in-cart {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 10px;
+  }
+
+  .cart-quantity {
+    font-weight: bold;
+    font-size: 20px;
+  }
+
+
+/* Отзывы */
+.review-section {
+  padding: 24px;
+  background-color: #fff0f2;
+  border-radius: 20px;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 0.95rem;
+  color: #333;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.03);
+}
+
+.review-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.review-list {
+  flex: 1;
+  min-width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.review-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.review-list::-webkit-scrollbar-thumb {
+  background-color: #f7acad;
+  border-radius: 6px;
+}
+
+.review-block {
+  background-color: #ffffff;
+  border: 1px solid #f7acad;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.review-block .email {
+  font-size: 0.82rem;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.review-block .text {
+  margin: 6px 0;
+  line-height: 1.5;
+  color: #444;
+}
+
+.review-block .date {
+  font-size: 0.8rem;
+  color: #777;
+  text-align: right;
+  display: block;
+  margin-top: 4px;
+}
+
+.review-form-wrapper {
+  flex: 1;
+  min-width: 320px;
+  background-color: #ffffff;
+  padding: 18px 20px;
+  border: 1px solid #f7acad;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+}
+
+.review-form-wrapper h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+  color: #f7acad;
+}
+
+.review-form textarea {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  resize: vertical;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  min-height: 100px;
+}
+
+.review-form button {
+  background-color: #f7acad;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  margin-top: 10px;
+}
+
+.review-form button:hover {
+  background-color: #c08788;
+}
+
+/* Звёзды */
+.review-form .rating-stars {
+  display: flex;
+  flex-direction: row-reverse; /* 5 слева, 1 справа */
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.rating-stars {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.rating-stars input[type="radio"] {
+  display: none;
+}
+
+.rating-stars label {
+  font-size: 26px;
+  color: #ccc;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.rating-stars label:hover,
+.rating-stars label:hover ~ label {
+  color: #f7acad;
+}
+
+.rating-stars input[type="radio"]:checked ~ label {
+  color: #f7acad;
+}
+
+
+
+@media (max-width: 768px) {
+  .review-grid {
+    flex-direction: column;
+  }
+
+  .review-form-wrapper,
+  .review-list {
+    min-width: 100%;
+  }
+
+  .review-form button {
+    width: 100%;
+  }
+}
+
+
+</style>
+{% endblock %}

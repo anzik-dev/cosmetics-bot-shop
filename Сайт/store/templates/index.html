@@ -1,0 +1,216 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <style>
+        .category-card.skincare {
+            background-image: url("{% static 'images/skincare.jpg' %}");
+        }
+
+        .category-card.lipstick {
+            background-image: url("{% static 'images/lipstick.jpg' %}");
+        }
+
+        .category-card.mascara {
+            background-image: url("{% static 'images/mascara.jpg' %}");
+        }
+    </style>
+
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecommerce beauty</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/Responsive.css' %}">
+    <link rel="shortcut icon" href="{% static 'images/beauty-logo.svg' %}" type="image/x-icon" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
+    <script src="{% static 'js/script.js' %}"></script>
+</head>
+
+<body>
+
+    <!--------------------HEADER---------------------->
+    <header id="header">
+        <a href="{% url 'index' %}"><img src="{% static 'images/logo_mini.png' %}" alt="beauty" class="logo"></a>
+        <nav>
+            <ul id="navbar" class="navbar">
+                <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+                <li><a href="{% url 'index' %}"
+                        class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Главная</a></li>
+                <li><a href="{% url 'shop' %}"
+                        class="{% if request.resolver_match.url_name == 'shop' %}active{% endif %}">Каталог</a></li>
+                <li><a href="{% url 'about' %}">О нас</a></li>
+                <li><a href="{% url 'contact' %}">Контакт</a></li>
+                <!---<li><a href="#"><i class="fa-solid fa-magnifying-glass icons-nav"></i></a></li>--->
+
+                <li><a href="{% url 'cart' %}"><i class="fa-solid fa-bag-shopping icons-nav"></i></a></li>
+                <li>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'profile' %}"><i class="fa-solid fa-user icons-nav"></i></a>
+                    {% else %}
+                    <a href="{% url 'login' %}"><i class="fa-solid fa-user icons-nav"></i></a>
+                    {% endif %}
+                </li>
+
+            </ul>
+        </nav>
+
+        <div id="mobile">
+            <i id="bar" class="fas fa-outdent" onclick="openNav()"></i>
+        </div>
+    </header>
+
+
+    <!--------------------wrapper---------------------->
+    <div class="wrapper">
+        <div class="side left">
+            <div class="caption">
+                <h4>GLOW&CO COSMETICS</h4>
+                <h2>Премиум косметика из Кореи</h2>
+                <h1>для сияющей кожи</h1>
+                <p><strong>Оформляйте заказы легко и с удовольствием 💖</strong></p>
+                <a class="button" href="{% url 'shop' %}">Перейти в каталог</a>
+            </div>
+        </div>
+        <div class="right" id="slider-wrapper">
+            <div id="slider1" class="slider-layer"></div>
+            <div id="slider2" class="slider-layer"></div>
+        </div>
+
+    </div>
+
+
+
+    <!--------------------Популярные категории---------------------->
+    <section class="popular-categories">
+        <h2>Популярные товары</h2>
+        <div class="category-grid">
+            {% for product in popular_items %}
+            <div class="product-card">
+                <a href="{% url 'product_detail' product.id %}">
+                    <img src="{{ product.main_image.url }}" alt="{{ product.name }}">
+                    <h3>{{ product.name }}</h3>
+                </a>
+                <p>{{ product.price|floatformat:0 }} ₸</p>
+            </div>
+            {% endfor %}
+
+        </div>
+    </section>
+
+
+
+
+    <!--------------------Highlight section----------------------->
+    <div class="Highlight">
+        <div class="caption">
+            <h2>​Мы — не как все</h2>
+            <p>Мы не просто продаём косметику.Мы подбираем её как для себя.
+                У нас только проверенные бренды, честные описания и доставка без сюрпризов.
+                Ты не переплачиваешь за маркетинг — только за качество.</p>
+            <a class="button" href="{% url 'shop' %}">Перейти в каталог</a>
+        </div>
+    </div>
+
+
+    <!--------------------grid section----------------------->
+    <!--<div class="grid">
+        <div class="child-box blue">
+            <div class="quote">"Истинная красота начинается с уверенности."</div>
+            <div class="author">— Анна, визажист</div>
+            <img src="{% static 'images/mini1.jpg' %}" alt="Анна">
+        </div>
+    
+        <div class="child-box pink">
+            <div class="quote">"Макияж — это не маска, а способ выразить себя."</div>
+            <div class="author">— Лейла, клиентка</div>
+            <img src="{% static 'images/mini2.jpg' %}" alt="Лейла">
+        </div>
+    
+        <div class="child-box yellow">
+            <div class="quote">"Уход за кожей — лучший подарок себе."</div>
+            <div class="author">— Айдана, косметолог</div>
+            <img src="{% static 'images/mini3.jpg' %}" alt="Айдана">
+        </div>
+    
+        <div class="child-box purple">
+            <div class="quote">"Вы — ваша главная ценность. Ухаживайте за собой."</div>
+            <div class="author">— Сара, психолог</div>
+            <img src="{% static 'images/mini4.jpg' %}" alt="Сара">
+        </div>
+    </div>-->
+
+
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-column">
+                <h3>О нас</h3>
+                <p>Мы предоставляем качественную косметику, чтобы ваша кожа была сияющей, здоровой и ухоженной каждый
+                    день.
+                </p>
+            </div>
+            <div class="footer-column">
+                <h3>Контакты</h3>
+                <p>Email: <a href="mailto:example@beautystore.com">glowcosmetickz@gmail.com</a></p>
+                <p>Телефон: <a href="tel:+77000000000">+7 (747) 622-29-84</a></p>
+            </div>
+            <div class="footer-column">
+                <h3>Наш Telegram-канал</h3>
+                <a href="https://t.me/glowandco" target="_blank" class="telegram-link">
+                    Подписаться в Telegram →
+                </a>
+                <h3>Мы в Instagram</h3>
+                <a href="https://www.instagram.com/glowncokazakhstan?igsh=aW40N2o1NGNpY3N0" target="_blank"
+                    class="instagram-link">
+                    Подписаться в Instagram →
+                </a>
+
+            </div>
+
+        </div>
+        <div class="footer-bottom">
+            <p>© 2025 GLOW&CO COSMETICS. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script>
+        const images = [
+            "{% static 'images/image1.JPEG' %}",
+            "{% static 'images/image2.JPEG' %}?v=4",
+            "{% static 'images/image3.JPEG' %}?v=3"
+        ];
+
+        let index = 0;
+        let showingFirst = true;
+
+        const slider1 = document.getElementById('slider1');
+        const slider2 = document.getElementById('slider2');
+
+        function showImage() {
+            const nextImage = images[index];
+            index = (index + 1) % images.length;
+
+            if (showingFirst) {
+                slider1.style.backgroundImage = `url('${nextImage}')`;
+                slider1.classList.add('visible');
+                slider2.classList.remove('visible');
+            } else {
+                slider2.style.backgroundImage = `url('${nextImage}')`;
+                slider2.classList.add('visible');
+                slider1.classList.remove('visible');
+            }
+
+            showingFirst = !showingFirst;
+        }
+
+        // инициализация
+        showImage();
+        setInterval(showImage, 5000);
+    </script>
+
+</html>

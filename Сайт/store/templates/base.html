@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Ecommerce Beauty{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style_for_accounts.css' %}">
+  <link rel="stylesheet" href="{% static 'css/Responsive.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="shortcut icon" href="{% static 'images/beauty-logo.svg' %}" type="image/x-icon" />
+  <script src="https://kit.fontawesome.com/4c94f24f7a.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header id="header">
+    <a href="{% url 'index' %}"><img src="{% static 'images/logo_mini.png' %}" alt="beauty" class="logo"></a>
+    <nav>
+      <ul id="navbar" class="navbar">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+        <li><a href="{% url 'index' %}"class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">Главная</a></li>
+        <li><a href="{% url 'shop' %}" class="{% if request.resolver_match.url_name == 'shop' %}active{% endif %}">Каталог</a></li>
+        <li><a href="{% url 'about' %}">О нас</a></li>
+        <li><a href="{% url 'contact' %}">Контакт</a></li>
+        <!---<li><a href="#"><i class="fa-solid fa-magnifying-glass icons-nav"></i></a></li>--->
+        
+        <li><a href="{% url 'cart' %}"><i class="fa-solid fa-bag-shopping icons-nav"></i></a></li>
+        <li>
+          {% if user.is_authenticated %}
+          <a href="{% url 'profile' %}"><i class="fa-solid fa-user icons-nav"></i></a>
+          {% else %}
+          <a href="{% url 'login' %}"><i class="fa-solid fa-user icons-nav"></i></a>
+          {% endif %}
+        </li>
+
+      </ul>
+    </nav>
+
+    <div id="mobile">
+      <i id="bar" class="fas fa-outdent" onclick="openNav()"></i>
+    </div>
+  </header>
+  <main>
+  {% block content %}{% endblock %}
+  </main>
+  
+
+ 
+
+  
+  <script src="{% static 'js/script.js' %}"></script>
+  <script src="{% static 'js/cart.js' %}"></script>
+</body>
+</html>

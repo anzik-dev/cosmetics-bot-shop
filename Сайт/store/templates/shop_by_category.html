@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}
+  {% if category_code == 'skincare' %}Уходовая косметика{% else %}Декоративная косметика{% endif %}
+{% endblock %}
+
+
+{% block content %}
+<section class="section-header">
+  <h2>
+    {% if category_code == 'skincare' %}
+    Уходовая косметика
+    {% else %}
+    Декоративная косметика
+    {% endif %}
+  </h2>
+
+  {% if category_code == 'skincare' or category_code == 'decorative' and not subcategory %}
+  <a href="{% url 'shop' %}" class="back-button"><strong>← Назад в магазин</strong></a>
+  {% elif category_code == 'decorative' and subcategory %}
+  <a href="{% url 'category_view' category_code %}" class="back-button"><strong>← Назад к подкатегориям</strong></a>
+  {% endif %}
+</section>
+
+<section class="section-p1">
+  {# ⬇️ Перенесли сюда внутрь розового блока ⬇️ #}
+  {% if category_code == 'decorative' and not subcategory %}
+  <div class="subcategory-grid">
+    {% for sub in subcategories %}
+    <a href="?subcategory={{ sub }}" class="subcategory-card">
+      <div class="subcategory-title">
+        {{ subcategory_display|get_item:sub }}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="pro-container">
+    {% for product in page_obj %}
+    <div class="pro">
+      <a href="{% url 'product_detail' product.id %}">
+        <img src="{{ product.main_image.url }}" alt="{{ product.name }}">
+        <h3>{{ product.name }}</h3>
+      </a>
+      <p style="font-size: 120%;">{{ product.short_description }}</p>
+      {% if product.discount > 0 %}
+      <p class="old-price" style="text-decoration: line-through; font-size: 150%">{{ product.price }} ₸</p>
+      <p class="discounted-price" style="color: #e53935; font-size: 150%">{{ product.get_discounted_price|floatformat:2 }} ₸</p>
+      <p class="discount-percent" style="background-color: #f7d0ab; color: white; padding: 4px 8px; border-radius: 8px; font-size: 120%; font-weight: bold; margin-top: 4px; display: inline-block;">Скидка {{ product.discount|floatformat:0 }}%</p>
+      {% else %}
+      <p class="normal-price" style="font-size: 150%">{{ product.price }} ₸</p>
+      {% endif %}
+      <p style="font-size: 120%;">В наличии: {{ product.stock }} шт.</p>
+
+      <form class="cart-form" data-product-id="{{ product.id }}">
+        {% csrf_token %}
+        {% if product.in_cart > 0 %}
+        <div class="in-cart">
+          <button type="button" class="cart-btn minus">−</button>
+          <span class="cart-quantity">В корзине: {{ product.in_cart }}</span>
+          <button type="button" class="cart-btn plus">+</button>
+        </div>
+        {% else %}
+        <button type="button" class="add-to-cart-btn">Добавить в корзину</button>
+        {% endif %}
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="pagination">
+  {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}">« Назад</a>
+  {% endif %}
+  {% for num in page_obj.paginator.page_range %}
+    <a href="?page={{ num }}" class="{% if page_obj.number == num %}active{% endif %}">{{ num }}</a>
+  {% endfor %}
+  {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}">Вперёд »</a>
+  {% endif %}
+</div>
+
+
+
+<style>
+  .back-button {
+    display: inline-block;
+    margin-bottom: 20px;
+    font-size: 18px;
+    text-decoration: none;
+    color: #fff;
+    background-color: #f7acad;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: 0.3s;
+  }
+
+  .back-button:hover {
+    background-color: #c08788;
+  }
+</style>
+{% endblock %}
