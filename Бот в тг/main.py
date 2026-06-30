@@ -16,9 +16,9 @@ def delete_after_delay(chat_id, message_id, delay):
         pass
 
 # ==================== Настройки ====================
-TOKEN = '7818783609:AAEWOI3xPYr9ajSDLCF6nK9Kn-SSP6Xd2mc'
-GROUP_CHAT_ID = -4971242631
-ADMIN_ID = 779172775  #Telegram ID администратора
+TOKEN = 'BOT_TOKEN'
+GROUP_CHAT_ID = "CHAT_ID"
+ADMIN_ID = "ADMIN_ID"  #Telegram ID администратора
 
 # Путь к базе данных
 load_dotenv()
