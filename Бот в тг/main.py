@@ -16,12 +16,13 @@ def delete_after_delay(chat_id, message_id, delay):
         pass
 
 # ==================== Настройки ====================
-TOKEN = 'BOT_TOKEN'
-GROUP_CHAT_ID = "CHAT_ID"
-ADMIN_ID = "ADMIN_ID"  #Telegram ID администратора
-
-# Путь к базе данных
 load_dotenv()
+
+
+TOKEN = os.getenv("BOT_TOKEN")
+GROUP_CHAT_ID = int(os.getenv("CHAT_ID"))
+ADMIN_ID = int(os.getenv("ADMIN_ID"))  #Telegram ID администратора
+
 
 BASE_DIR = Path(__file__).resolve().parent  # Бот в тг
 COMMON_DB_DIR = BASE_DIR.parent / "Общая БД"  # папка с основной базой
@@ -131,7 +132,7 @@ products_clean = {
         'name': 'ACWELL LICORICE PH BALANCING ESSENCE MIST',
         'short_name': 'ACWELL',
         'short_description':'эссенция-спрей для увлажнения и выравнивания pH',
-         'photo':os.path.join("images", "1. ACWELL.JPG"),
+         'photo':os.path.join("Сайт\images", "1. ACWELL.JPG"),
         'price': 8900,
         'stock': 10,
         'description': 'Идеален для обладателей чувствительной, обезвоженной, уставшей кожи, кому нужен нежный уход и увлажнение. Подойдёт как ежедневный увлажняющий мист в сухих помещениях или после очищения.'
@@ -140,7 +141,7 @@ products_clean = {
         'name': 'ACWELL LICORICE PH BALANCING INTENSIVE EYE CREAM',
         'short_name': 'ACWELL',
         'short_description':'крем для кожи вокруг глаз',
-        'photo':os.path.join("images", "2. ACWELL eye cream.JPG"),
+        'photo':os.path.join("Сайт\images", "2. ACWELL eye cream.JPG"),
         'price': 10400,
         'stock': 10,
         'description': 'В подборке лучших корейских кремов для глаз от Glamour ACWELL Licorice pH Balancing Intensive Eye Cream назван одним из лучших для борьбы с тёмными кругами благодаря комбинации солодки, пептидов, кофеина и антиоксидантов.'
@@ -149,7 +150,7 @@ products_clean = {
         'name': "SAM'U GALACTO PORE 02 TONER",
         'short_name': "SAM'U",
         'short_description': 'тоник для сужения пор',
-        'photo': os.path.join("images", "3. GALACTO PORE toner.JPG"),
+        'photo': os.path.join("Сайт\images", "3. GALACTO PORE toner.JPG"),
         'stock': 10,
         'price': 7990,
         'description': 'Это корейский тоник, предназначенный для сужения пор, увлажнения и улучшения текстуры кожи. Он сочетает в себе ферментированные компоненты, кислородные пузырьки и растительные экстракты, что делает его подходящим для жирной, комбинированной и склонной к акне кожи.'
@@ -158,7 +159,7 @@ products_clean = {
         'name': "SAM'U GALACTO PORE SERUM",
         'short_name': "SAM'U",
         'short_description':'сыворотка для пор и текстуры кожи',
-        'photo': os.path.join("images", "4. GALACTO PORE SERUM.JPG"),
+        'photo': os.path.join("Сайт\images", "4. GALACTO PORE SERUM.JPG"),
         'price': 9990,
         'stock': 10,
         'description': "Предназначенная для сужения пор, улучшения текстуры кожи и увлажнения. Она является частью популярной линии Galacto Pore от бренда SAM'U, известного своими средствами с ферментированными компонентами."
@@ -167,7 +168,7 @@ products_clean = {
         'name': "SAM'U WATER TO AMPOULE TREATMENT ",
         'short_name': "SAM'U",
         'short_description':'увлажняющая эссенция-тонер',
-        'photo': os.path.join("images", "17. SAMU.JPG"),
+        'photo': os.path.join("Сайт\images", "17. SAMU.JPG"),
         'price': 12900,
         'stock': 10,
         'description': 'Это несмываемая ампульная сыворотка для волос, предназначенная для интенсивного увлажнения и восстановления структуры волос'
@@ -176,7 +177,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE AMPOULE",
         'short_name': "SAM'U",
         'short_description':'ампула для чувствительной кожи',
-        'photo': os.path.join("images", "6. PH SENSITIVE AMPOULE(сыворотка).JPG"),
+        'photo': os.path.join("Сайт\images", "6. PH SENSITIVE AMPOULE(сыворотка).JPG"),
         'price': 13200,
         'stock': 10,
         'description': 'Сыворотке-ампуле для чувствительной и сухой кожи: Идеальна для чувствительной, сухой и комбинированной кожи; Придаёт увлажнение и комфорт без липкости; Прекрасно работает как сыворотка после тонера.'
@@ -185,7 +186,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE CREAM",
         'short_name': "SAM'U",
         'short_description':' увлажняющий крем для чувствительной кожи',
-        'photo': os.path.join("images", "7. PH SENSITIVE CREAM.JPG"),
+        'photo': os.path.join("Сайт\images", "7. PH SENSITIVE CREAM.JPG"),
         'price': 10500,
         'stock': 10,
         'description': 'Это качественный корейский уходовый крем в тюбике, сохраняющий влагу, балансирует pH и подходит для разных типов кожи. Рекомендован, если ищешь нежную текстуру и барьерную защиту.'
@@ -194,7 +195,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE CREAM MIST",
         'short_name': "SAM'U",
         'short_description':'крем-спрей для увлажнения',
-        'photo': os.path.join("images", "8. PH SENSITIVE CREAM MIST.JPG"),
+        'photo': os.path.join("Сайт\images", "8. PH SENSITIVE CREAM MIST.JPG"),
         'price': 10590,
         'stock': 10,
         'description': 'Легчайший крем в формате миста. Удобен для применения в любое время дня:\n• используется как основа под макияж,\n• как фиксатор макияжа,\n• как средство для освежения и увлажнения в течение дня.'
@@ -203,7 +204,7 @@ products_clean = {
         'name': "SAM'U PHSENSITIVE FACIAL TREATMENT",
         'short_name': "SAM'U",
         'short_description':'средство для восстановления кожи',
-        'photo': os.path.join("images", "9. PH SENSITIVE FACIAL TREATMENT.JPG"),
+        'photo': os.path.join("Сайт\images", "9. PH SENSITIVE FACIAL TREATMENT.JPG"),
         'price': 13590,
         'stock': 10,
         'description': 'Ты ищешь заключительный этап ухода — ампула-лосьон, укрепляющая барьер и удерживающая влагу. Твоя кожа сухая, чувствительная или комбинированная, и нужна лёгкая, но эффективная формула. Ты хочешь удобное базовое средство под макияж с pH балансом.'
@@ -212,7 +213,7 @@ products_clean = {
         'name': "SAM'U SENSITIVE POCKET SUN STICK",
         'short_name': "SAM'U",
         'short_description':'солнцезащитный стик',
-        'photo': os.path.join("images", "10. SENSITIVE POCKET SUN STICK.JPG"),
+        'photo': os.path.join("Сайт\images", "10. SENSITIVE POCKET SUN STICK.JPG"),
         'price': 10500,
         'stock': 10,
         'description': 'СПФ компактная Удобен для мгновенного нанесения и повторного применения в течение дня, без рук . Текстура не оставляет блеска и не белит, ощущается лёгкая и бархатная.'
@@ -221,7 +222,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE SPOT CREAM",
         'short_name': "SAM'U",
         'short_description':'точечный крем от воспалений',
-        'photo': os.path.join("images", "11. PH SENSITIVE SPOT CREAM.JPG"),
+        'photo': os.path.join("Сайт\images", "11. PH SENSITIVE SPOT CREAM.JPG"),
         'price': 7990,
         'stock': 10,
         'description': 'Это локальное средство, которое:\n• Наносится точечно на участки покраснений, раздражений, шелушений;\n• Помогает успокоить кожу, особенно если есть высыпания, раздражение, зуд, сухость;\n• Подходит для чувствительной, реактивной, склонной к дерматиту кожи.'
@@ -230,7 +231,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE SUN CREAM",
         'short_name': "SAM'U",
         'short_description':'солнцезащитный крем для чувствительной кожи',
-        'photo': os.path.join("images", "12. PH SENSITIVE SUNCREAM.JPG"),
+        'photo': os.path.join("Сайт\images", "12. PH SENSITIVE SUNCREAM.JPG"),
         'price': 8990,
         'stock': 10,
         'description': 'Защита SPF 50+ PA++++ без белого следа; Увлажняющий и барьер защитный эффект — особенно для сухой, комбинированной и чувствительной кожи; Лёгкая текстура, уход под макияж, без липкости.'
@@ -239,7 +240,7 @@ products_clean = {
         'name': "SAM'U PH SENSITIVE TONER PAD(RENEWAL)",
         'short_name': "SAM'U",
         'short_description':'пэды с успокаивающим тоником',
-        'photo': os.path.join("images", "13. PH SENSITIVE TONER PAD.JPG"),
+        'photo': os.path.join("Сайт\images", "13. PH SENSITIVE TONER PAD.JPG"),
         'price': 10005,
         'stock': 10,
         'description': 'Это мягкие, комфортные тонер-пады с акцентом на увлажнение, pH-баланс и бережное очищение. Отличный выбор в качестве освежающего ухода и экспресс-маски, особенно для чувствительной кожи.'
@@ -248,7 +249,7 @@ products_clean = {
         'name': "SAM’U BORN PANTHENOL JELLY WASH",
         'short_name': "SAM'U",
         'short_description':'гель для умывания с пантенолом',
-        'photo': os.path.join("images", "14. Born Panthenol(JELLY WASH).JPG"),
+        'photo': os.path.join("Сайт\images", "14. Born Panthenol(JELLY WASH).JPG"),
         'price': 7800,
         'stock': 10,
         'description': 'Это корейское очищающее средство с текстурой желе, предназначенное для увлажнения и успокоения кожи. Подходит для:\n• Сухой и чувствительной кожи, нуждающейся в увлажнении и успокоении.\n• Тех, кто ищет мягкое очищающее средство без агрессивных компонентов'
@@ -257,7 +258,7 @@ products_clean = {
         'name': "DEW CARE VITAMIN TO- GLOW PACK",
         'short_name': "DEW CARE",
         'short_description':'мини-набор с витаминными средствами',
-        'photo': os.path.join("images", "15. BRIGHT SIDE UP.JPG"),
+        'photo': os.path.join("Сайт\images", "15. BRIGHT SIDE UP.JPG"),
         'price': 13000,
         'stock': 10,
         'description': "🍊 Bright Side Up (серум с витамином C)\n📌 Для чего: Осветляет пигментацию, придаёт коже сияние, защищает от свободных радикалов.\n👤 Кому подойдёт: Для тусклой, усталой, неровной кожи.\n🧪 Активы: Витамин C, ниацинамид, экстракт грейпфрута.\n\n💧 Say You Dew (увлажняющий крем)\n📌 Для чего: Увлажняет и смягчает кожу, улучшает барьер.\n👤 Кому подойдёт: Сухой, комбинированной коже.\n🧪 Формула: Гелевая, освежающая, с витаминами C и E, лимонным экстрактом.\n\n💄 Plush Party (ночная маска для губ)\n📌 Для чего: Питает, восстанавливает губы во время сна.\n🧪 Активы: Масло какао, витамин E, пептиды."
@@ -266,7 +267,7 @@ products_clean = {
         'name': 'I DEW CARE THIRST THINGS FIRST',
          'short_name': "DEW CARE",
         'short_description':'увлажняющий витаминный мист',
-        'photo': os.path.join("images", "16. THIRST THINGS FIRST.JPG"),
+        'photo': os.path.join("Сайт\images", "16. THIRST THINGS FIRST.JPG"),
         'price': 12500,
         'stock': 10,
         'description': 'Обеспечивают сияние, увлажнение и защиту кожи . Подходит для: сухой, обезвоженной, тусклой кожи; фиксации макияжа; свежести в течение дня; ночной маски-спрея .'
@@ -275,7 +276,7 @@ products_clean = {
         'name': "I DEW CARE LET'S GET SHEET FACED",
         'short_name': "DEW CARE",
         'short_description':'набор тканевых масок для лица',
-        'photo': os.path.join("images", "5. IN THE ZONE.JPG"),
+        'photo': os.path.join("Сайт\images", "5. IN THE ZONE.JPG"),
         'price': 19500,
         'stock': 10,
         'description': 'Маска увлажняющая.'
