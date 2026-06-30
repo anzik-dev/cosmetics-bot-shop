@@ -39,7 +39,7 @@ print("Существует:", STOCK_DB_PATH.exists())
 # ==========================================================
 # Основные настройки Django
 # ==========================================================
-SECRET_KEY = 'django-insecure-oper)n+v2oxed4s$ocp)3ab(w9k6wryb@vb7*ewrlq!dbjg(sn'
+SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '172.20.10.3', "1d5e964c65fa.ngrok-free.app"]
 
