@@ -28,7 +28,7 @@ This project is based on a template originally created by Hawra al Ramadan (MIT 
 - SQLite
 - Git
 - telebot
-Проект создавался как практичекий и одновременно для продажи компании, которая собиралась продовать космеику.
+
 
 ## Скриншоты сайта
 
